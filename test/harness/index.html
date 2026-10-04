@@ -1,0 +1,69 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!-- Planar Codex test harness: a stand-in journal page with stubbed Foundry globals.
+     Run `npm run harness` and open http://localhost:8765/test/harness/ (add ?flat=1 for blocks directly in the page). -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,700;1,400;1,700&family=Roboto+Slab:wght@400;700&display=swap">
+<link rel="stylesheet" href="../../styles/codex.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #111; overflow: hidden; }
+  .app { position: absolute; left: 40px; top: 30px; width: 760px; height: 820px; display: flex; flex-direction: column;
+         background: #1b1916; border: 1px solid #444; border-radius: 6px; container-type: inline-size; }
+  .app header { padding: 6px 10px; color: #ccc; font: 13px sans-serif; border-bottom: 1px solid #333; }
+  .journal-entry-pages { flex: 1; overflow-y: auto; padding: 10px 22px; }
+  .journal-page-header h1 { color: #fff; font-family: serif; }
+  h1,h2,h3,h4 { color: #f2eee6; font-family: "Roboto Slab", serif; }
+</style></head>
+<body>
+<div class="app"><header>Journal — Chapter 01 - The Sunken Road</header>
+<div class="journal-entry-pages"><article class="journal-entry-page text" data-page-id="p1"></article></div></div>
+<script type="module">
+  const lang = await (await fetch("../../lang/en.json")).json();
+  const settings = { autocomplete: true, inlineEdit: true, dblclickEdit: true, editorSource: false, showBacklinks: false, fontSize: 15, rootFolder: "", assetMap: {} };
+  const get = (o, k) => k.split(".").reduce((a, b) => a?.[b], o);
+  window.CONFIG = { DND5E: {} , TextEditor: { enrichers: [] } };
+  window.ui = { notifications: { info: m => console.log("INFO", m), warn: m => console.log("WARN", m), error: m => console.log("ERR", m) } };
+  window.fromUuid = async () => null;
+  window.foundry = { applications: { api: { DialogV2: { confirm: async () => true, prompt: async () => null } } }, utils: {} };
+  const md0 = await (await fetch("note.md")).text();
+  const mkPage = (name, md, id) => {
+    const page = { id, name, uuid: `JournalEntry.${id}.JournalEntryPage.${id}`, documentName: "JournalEntryPage", type: "text", isOwner: true,
+      text: { markdown: md, content: "" }, flags: { "planar-codex": { path: `Prep/${name}.md`, meta: {} } },
+      getFlag(s, k) { return s === "core" ? (k === "sheetClass" ? "planar-codex.CodexMarkdownSheet" : null) : this.flags[s]?.[k]; } };
+    const pages = [page]; pages.contents = pages; pages.get = i => i === id ? page : null;
+    page.parent = { name, pages, sheet: { render() {} } };
+    return page;
+  };
+  const page = mkPage("Chapter 01 - The Sunken Road", md0, "p1");
+  const others = ["Brannoc", "Old Mara", "Captain Ilvane", "Ilsa", "Payoff Ledger", "Session 00 - The Lantern Fair"].map((n, i) => mkPage(n, `# ${n}`, `o${i}`));
+  window.game = {
+    user: { isGM: true }, users: {}, packs: { get: () => null, filter: () => [] }, collections: { get: () => null },
+    actors: [], items: [], scenes: [], tables: [], playlists: [], macros: [],
+    journal: [page.parent, ...others.map(p => p.parent)],
+    settings: { get: (m, k) => settings[k], set: async (m, k, v) => { settings[k] = v; } },
+    i18n: { localize: k => get(lang, k) ?? k, format: (k, d) => (get(lang, k) ?? k).replace(/\{(\w+)\}/g, (_, x) => d[x]) }
+  };
+  const { convert } = await import("../../scripts/codex.mjs");
+  const inline = await import("../../scripts/inline-edit.mjs");
+  window.inline = inline;
+  const root = document.querySelector("article");
+  const sheet = { document: page };
+  function renderView() {
+    const { html } = convert(page.text.markdown, { gm: true, page, lines: true });
+    root.innerHTML = location.search.includes("flat")
+      ? `<header class="journal-page-header"><h1>${page.name}</h1></header>${html}`
+      : `<header class="journal-page-header"><h1>${page.name}</h1></header><section class="journal-page-content">${html}</section>`;
+    root.classList.add("planar-codex", "codex-page");
+    inline.onViewRendered(sheet, root);
+  }
+  page.update = async data => {
+    page.text.markdown = data["text.markdown"]; page.text.content = data["text.content"];
+    window.saves = (window.saves ?? 0) + 1;
+    setTimeout(renderView, 30);
+  };
+  renderView();
+  window.renderView = renderView;
+  window.page = page;
+  window.ready = true;
+</script>
+</body></html>
