@@ -1,0 +1,3 @@
+* text=auto eol=lf
+*.png binary
+lib/*.esm.js linguist-vendored -diff

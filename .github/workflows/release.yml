@@ -1,0 +1,56 @@
+name: Release
+
+# Push a tag like v0.4.0 to publish a GitHub release (and, once the package is listed, a foundryvtt.com version).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      # Optional. Set this repository secret only after the package exists on foundryvtt.com.
+      FOUNDRY_PACKAGE_TOKEN: ${{ secrets.FOUNDRY_PACKAGE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+      - name: Read version from the tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Tag and module.json agree
+        run: |
+          test "$(node -p "require('./module.json').version")" = "$VERSION" \
+            || (echo "module.json version differs from tag $GITHUB_REF_NAME" && exit 1)
+
+      - name: Build module.json and module.zip
+        run: node tools/package.mjs --version "$VERSION" --repo "$GITHUB_REPOSITORY"
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" {on=1; next}
+            on && /^## \[/ {exit}
+            on {print}
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Release $VERSION" > notes.md
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: notes.md
+          files: |
+            dist/module.json
+            dist/module.zip
+
+      - name: Tell foundryvtt.com about the new version
+        if: ${{ env.FOUNDRY_PACKAGE_TOKEN != '' }}
+        run: node tools/release-api.mjs --version "$VERSION" --repo "$GITHUB_REPOSITORY"

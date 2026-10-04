@@ -1,0 +1,151 @@
+{
+  "PLANARCODEX": {
+    "SheetLabel": "Planar Codex (Markdown)",
+    "Backlinks": {
+      "Title": "Mentioned in"
+    },
+    "Directory": {
+      "Import": "Import vault",
+      "Export": "Export vault",
+      "NewNote": "New note"
+    },
+    "Settings": {
+      "RootFolderName": "Codex folder",
+      "RootFolderNameHint": "Journal folder that holds imported notes.",
+      "ShowBacklinks": "Show backlinks",
+      "ShowBacklinksHint": "List the notes that link to a note at the bottom of the GM view.",
+      "Autocomplete": "Autocomplete in the editor",
+      "AutocompleteHint": "Type [[ in a Codex note to link notes, actors, items, spells, monsters and more; [[/ for roll buttons.",
+      "FontSize": "Codex text size",
+      "FontSizeHint": "Size of body text in Codex notes, on this computer.",
+      "InlineEdit": "Edit notes in place",
+      "InlineEditHint": "Foundry's edit control opens the Codex editor right where you are reading, instead of a separate window at the top of the note. The window still opens when the note isn't on screen.",
+      "DblclickEdit": "Double-click to edit",
+      "DblclickEditHint": "Double-click a paragraph, list item or callout in a Codex note to edit it right there.",
+      "CitationPrefixes": "Citation prefixes",
+      "CitationPrefixesHint": "Inline code starting with one of these (comma separated) shows as a small book reference instead of code, e.g. `PHB, Ch. 7 › Fireball`. A prefix containing a backslash is read as a regular expression."
+    },
+    "Import": {
+      "Title": "Import Obsidian vault",
+      "Intro": "Pick your vault folder. Notes become journal entries with Markdown pages in the Codex folder. The files stay where they are; nothing is uploaded except images that notes embed.",
+      "Pick": "Choose vault folder",
+      "NoVault": "No folder chosen yet.",
+      "Folders": "Folders to import",
+      "FoldersHint": "Unticked folders are skipped. Sources, Tools and editor folders are off by default.",
+      "RootFiles": "(files at the vault root)",
+      "RootFolder": "Codex folder name",
+      "Conflicts": "A note changed in both the vault and Foundry",
+      "ConflictKeep": "Keep the Foundry version (recommended)",
+      "ConflictVault": "Take the vault version (Foundry edits are lost)",
+      "ConflictBoth": "Keep both (vault copy saved as \"(vault)\")",
+      "Run": "Import",
+      "Reading": "Reading notes…",
+      "Uploading": "Uploading embedded files…",
+      "Creating": "Creating notes {done}/{total}…",
+      "Done": "Import finished.",
+      "Failed": "Import failed",
+      "ConflictKeptFoundry": "kept the Foundry version",
+      "ConflictTookVault": "took the vault version",
+      "ConflictMadeCopy": "saved the vault version as a copy"
+    },
+    "Report": {
+      "Title": "Codex import report",
+      "Summary": "Summary",
+      "Created": "Notes created",
+      "Updated": "Notes updated",
+      "Unchanged": "Unchanged or kept",
+      "Conflicts": "Conflicts",
+      "Files": "Files uploaded",
+      "Links": "Note links",
+      "Resolved": "resolved",
+      "Typed": "document links",
+      "Dangling": "Links to notes that don't exist",
+      "Ambiguous": "Links that matched more than one note",
+      "Also": "also",
+      "MissingFiles": "Embedded files not found",
+      "ConflictList": "Conflicts",
+      "Skipped": "Skipped files",
+      "None": "None."
+    },
+    "Export": {
+      "Title": "Export notes to the vault",
+      "Intro": "Saves notes as Markdown with the vault's folder layout. Unzip over the vault folder to update it. Links to world actors, items and scenes are written as [[actor:Name]] so they survive a re-import.",
+      "OnlyChanged": "Only notes changed since import or last export",
+      "MarkSynced": "Mark exported notes as in sync with the vault",
+      "Notes": "{count} notes",
+      "Nothing": "Nothing to export.",
+      "Zip": "Download zip",
+      "Folder": "Write to a folder…",
+      "NoFolderAccess": "Writing straight into a folder needs a secure connection (https or localhost); the zip works everywhere.",
+      "Done": "Exported {count} notes."
+    },
+    "Link": {
+      "CreateTitle": "Create note",
+      "CreatePrompt": "There is no note called <strong>{name}</strong> yet. Create it?",
+      "CreateTooltip": "No such note yet. Click to create it.",
+      "TypedMissing": "No world or compendium document with this name."
+    },
+    "Note": {
+      "NewTitle": "New Codex note",
+      "Name": "Name",
+      "Create": "Create",
+      "Created": "Created note {name}."
+    },
+    "ReadAloud": {
+      "Title": "Read-aloud",
+      "Narrator": "Narrator",
+      "Show": "Show to players",
+      "Post": "Post to chat",
+      "Shown": "Shown to players.",
+      "ShowShort": "Show",
+      "PostShort": "Chat"
+    },
+    "Whisper": {
+      "Button": "Whisper to {name}'s player",
+      "NoPlayer": "No player owns a character called {name}.",
+      "Sent": "Sent to {name}'s player.",
+      "Speaker": "A private thought",
+      "Short": "Whisper"
+    },
+    "Share": {
+      "Button": "Share with {name}",
+      "Done": "{note} shared with {name}'s player."
+    },
+    "Autocomplete": {
+      "Insert": "Insert",
+      "Nothing": "No matches",
+      "HintLink": "Notes, actors, items, spells, monsters, scenes · type spell: or monster: to narrow · # for headings · / for rolls · Enter to insert, Esc to close",
+      "HintHeading": "Headings in that note",
+      "HintRoll": "Roll button: pick one, then fill in the details"
+    },
+    "Rebuilt": "Planar Codex refreshed {count} notes for the new version.",
+    "Keybindings": {
+      "EditHere": "Planar Codex: edit the note here",
+      "EditHereHint": "Open the Codex editor at the part of the note you are looking at (press again, or Esc, to finish)."
+    },
+    "Editor": {
+      "Done": "Done",
+      "Live": "Live Preview",
+      "Source": "Source",
+      "ModeTooltip": "Switch between Live Preview and Markdown source (Ctrl+/)",
+      "Hint": "Ctrl+S save · Esc done · [[ link · [[/ roll",
+      "Discard": "Discard changes",
+      "DiscardConfirm": "Throw away the changes made since the last save?",
+      "Foundry": "Open in Foundry's editor window",
+      "Placeholder": "Start writing…",
+      "EditHere": "Edit",
+      "EditHereTooltip": "Edit this note where you are (Ctrl+E). Double-click any paragraph to edit there.",
+      "EditSection": "Edit from here",
+      "ConflictTitle": "Note changed meanwhile",
+      "Conflict": "This note was changed somewhere else after you started editing. Save your version over it?",
+      "SaveFailed": "Planar Codex: the note could not be saved. Your text is still in the editor.",
+      "AutoSaved": "Planar Codex: saved your edits to {name}.",
+      "State": {
+        "saved": "Saved",
+        "dirty": "Unsaved changes",
+        "saving": "Saving…",
+        "error": "Not saved"
+      }
+    }
+  }
+}
