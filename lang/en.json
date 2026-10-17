@@ -105,11 +105,16 @@
       "NoPlayer": "No player owns a character called {name}.",
       "Sent": "Sent to {name}'s player.",
       "Speaker": "A private thought",
-      "Short": "Whisper"
+      "Short": "Whisper",
+      "FullScreen": "Whisper to {name}'s player, full screen (Planar Whispers)",
+      "QueueShort": "Queue",
+      "Queue": "Put it in the Planar Whispers queue for {name}"
     },
     "Share": {
       "Button": "Share with {name}",
-      "Done": "{note} shared with {name}'s player."
+      "Done": "{note} shared with {name}'s player.",
+      "Reveal": "Reveal to {name}",
+      "RevealTooltip": "Open this note full screen on their screen, as a letter (Planar Whispers)"
     },
     "Autocomplete": {
       "Insert": "Insert",

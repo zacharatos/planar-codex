@@ -4,6 +4,7 @@
  *  - Obsidian syntax (wikilinks, callouts, comments, highlights, tasks) rendered on save and on view
  *  - a GM view with DM-only callouts, private lines, comments, properties and backlinks
  *  - read-aloud / whisper / share buttons, clickable task lists
+ *    (with Planar Whispers active, private lines and handouts go full screen through its API)
  *  - drag a Codex note into the editor to insert [[Note]]
  */
 import { MODULE_ID, convert, getMarkdown, markdownUpdate, updateMarkdown, isCodexPage, localize, FORMAT_MARKDOWN } from "./codex.mjs";
@@ -14,6 +15,12 @@ import { attachAutocomplete } from "./autocomplete.mjs";
 import { onViewRendered, interceptEdit, editInPlace, contentContainer } from "./inline-edit.mjs";
 
 const Base = foundry.applications.sheets.journal.JournalEntryPageMarkdownSheet;
+
+/** The Planar Whispers API, when that module is active. */
+function whispersApi() {
+  const mod = game.modules.get("planar-whispers");
+  return mod?.active ? mod.api ?? null : null;
+}
 
 export class CodexMarkdownSheet extends Base {
   static DEFAULT_OPTIONS = {
@@ -115,10 +122,35 @@ export class CodexMarkdownSheet extends Base {
         btn("fa-solid fa-display", localize("ReadAloud.ShowShort"), localize("ReadAloud.Show"), () => showToPlayers(label, body.innerHTML));
         btn("fa-solid fa-comment", localize("ReadAloud.PostShort"), localize("ReadAloud.Post"), () => postToChat(label, body.innerHTML));
       } else if ( kind === "whisper" ) {
-        btn("fa-solid fa-paper-plane", localize("Whisper.Short"), localize("Whisper.Button", { name: label || "?" }), () => whisperTo(label, body.innerHTML));
+        const pw = whispersApi();
+        if ( pw?.fromCallouts ) {
+          const send = queue => pw.fromCallouts(this.#whisperGroup(root, box, pw), { source: this.document.uuid, queue })
+            .catch(err => ui.notifications.warn(err.message));
+          btn("fa-solid fa-paper-plane", localize("Whisper.Short"), localize("Whisper.FullScreen", { name: label || "?" }), () => send(false));
+          btn("fa-solid fa-hourglass-start", localize("Whisper.QueueShort"), localize("Whisper.Queue", { name: label || "?" }), () => send(true));
+        } else {
+          btn("fa-solid fa-paper-plane", localize("Whisper.Short"), localize("Whisper.Button", { name: label || "?" }), () => whisperTo(label, body.innerHTML));
+        }
       }
       title.append(actions);
     }
+  }
+
+  /**
+   * A private line for Planar Whispers, with every other private line in the note that shares its
+   * `together=<name>` option (they are sent as one group, at the same moment).
+   */
+  #whisperGroup(root, box, pw) {
+    const one = b => ({
+      targets: b.dataset.title ?? "",
+      meta: b.dataset.meta ?? "",
+      html: b.querySelector(":scope > .codex-callout-content")?.innerHTML ?? ""
+    });
+    const together = pw.parseMeta(box.dataset.meta ?? "").together;
+    if ( !together ) return [one(box)];
+    return Array.from(root.querySelectorAll(".codex-callout-whisper"))
+      .filter(b => pw.parseMeta(b.dataset.meta ?? "").together === together)
+      .map(one);
   }
 
   /** GM toolbar: edit in place, and share a handout with the player(s) named in `player:` frontmatter. */
@@ -138,6 +170,15 @@ export class CodexMarkdownSheet extends Base {
       bar.append(edit);
     }
     for ( const who of players ) {
+      const pw = whispersApi();
+      if ( pw?.send ) {
+        const r = document.createElement("button");
+        r.type = "button";
+        r.innerHTML = `<i class="fa-solid fa-envelope-open-text"></i> ${localize("Share.Reveal", { name: escapeHTML(who) })}`;
+        r.dataset.tooltip = localize("Share.RevealTooltip");
+        r.addEventListener("click", () => pw.send({ to: who, page }).catch(err => ui.notifications.warn(err.message)));
+        bar.append(r);
+      }
       const b = document.createElement("button");
       b.type = "button";
       b.innerHTML = `<i class="fa-solid fa-share-from-square"></i> ${localize("Share.Button", { name: escapeHTML(who) })}`;

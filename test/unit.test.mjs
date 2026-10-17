@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import * as M from "../scripts/markdown.mjs";
-import { NoteIndex, linkReport } from "../scripts/resolver.mjs";
+import { NoteIndex, linkReport, buildNameLookup, pickByName } from "../scripts/resolver.mjs";
 import { planImport, diffImport, toVaultMarkdown, stripRoot, pathForNewNote } from "../scripts/vault.mjs";
 import { buildZip } from "../scripts/zip.mjs";
 import { render, parseFragment } from "./helpers.mjs";
@@ -40,6 +40,21 @@ test("callouts: player view drops DM, whisper, comments; keeps read-aloud; secre
   assert.match(p, /<section[^>]*class="secret"/);
   const g = conv(md, true).html;
   assert.match(g, /hidden/); assert.match(g, /psst/); assert.match(g, /codex-comment/);
+});
+
+test("callout options after | are kept on the box; the player view still drops private lines", () => {
+  const md = "> [!whisper|memory|together=song] Ilsa, Brannoc\n> «line»\n\n> [!note|wide] Title\n> body";
+  const g = conv(md, true).html;
+  assert.match(g, /codex-callout-whisper/);
+  assert.match(g, /data-meta="memory\|together=song"/);
+  assert.match(g, /data-title="Ilsa, Brannoc"/);
+  assert.match(g, /«line»/);
+  assert.doesNotMatch(g, /\[!whisper/);
+  assert.match(g, /codex-callout-note/);
+  assert.match(g, /data-meta="wide"/);
+  const p = conv(md, false).html;
+  assert.doesNotMatch(p, /«line»/);
+  assert.match(p, /codex-callout-note/);
 });
 
 test("secret ids are stable and revealed state survives", () => {
@@ -144,4 +159,21 @@ test("autocomplete trigger and matching", async () => {
   assert.ok(score("Ελάιον Ντον", "ελαι") > 0);
   assert.ok(score("Chapter 01 - The Sunken Road", "sunken") > score("Chapter 01 - The Sunken Road", "unken"));
   assert.equal(score("Brannoc", "zzz"), 0);
+});
+
+test("typed-link name lookup: normalised names, type preference, first match otherwise", () => {
+  const entries = [
+    { name: "Fireball", type: "feat", id: 1 },
+    { name: "fireball ", type: "spell", id: 2 },
+    { name: "Fireball", type: "spell", id: 3 },
+    { name: "Brannoc", type: "npc", id: 4 },
+    { name: "", id: 5 }
+  ];
+  const lookup = buildNameLookup(entries);
+  assert.equal(pickByName(lookup, M.normalizeKey("FIREBALL"), "spell").id, 2, "first of the wanted type");
+  assert.equal(pickByName(lookup, "fireball", "weapon").id, 1, "falls back to the first with that name");
+  assert.equal(pickByName(lookup, "fireball").id, 1);
+  assert.equal(pickByName(lookup, "brannoc").id, 4);
+  assert.equal(pickByName(lookup, "nobody"), null);
+  assert.equal(lookup.size, 2, "empty names are skipped");
 });

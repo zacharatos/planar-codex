@@ -104,6 +104,7 @@ Import and export
 Reading view (as GM, then as a player)
 - Wikilinks, heading links, typed links and embeds open the right document/section; an unresolved link offers to create the note.
 - Read-aloud: Show to players opens the pop-up for every player; Post to chat posts it. Private line: Whisper reaches only the owner of the named character. Handout `player:` shows the Share button.
+- With Planar Whispers active: a private line shows *Whisper* and *Queue*; *Whisper* opens it full screen on the named player's screen (not in chat). `> [!whisper|voice|burn] A, B` goes to both in the Voice style with burn. Two private lines with `together=x` in one note: either *Whisper* sends both at the same moment. A `player:` handout shows *Reveal to …*. Disable Planar Whispers: the buttons go back to the chat whisper. `[!note|wide]` still renders as a note callout, in the reading view and in the editor.
 - Secrets reveal and stay revealed after the note is edited.
 - Tasks tick and the tick survives a reload.
 - As a player: no DM boxes, private lines, comments, properties, pencils or Edit button.
@@ -118,6 +119,9 @@ Editing
 - Edit the same note in two browsers: the second save asks before overwriting.
 - Drop an actor, an item and a Codex note into the editor.
 - Pop the journal out (V14 pop-out): editing and autocomplete work in the pop-out window.
+- As a player, reload with the network tab open: `codemirror.esm.js` is **not** downloaded. As the GM, open a Codex note: it downloads once in the background, and the first double-click opens the editor.
+- A prep page with many `[[spell:…]]` / `[[actor:…]]` links: links resolve as before (2024 compendium entries first, world documents before compendiums). Rename a world actor that a link points to: after the page re-renders, the link follows the new name only if the text matches it.
+- Rename a note: links to it by its new name resolve. Edit a note's text only: backlinks on the target note update (GM view).
 
 ## Changing things
 
@@ -125,6 +129,7 @@ Editing
 - **New pure logic**: put it in `markdown.mjs`, `resolver.mjs` or `vault.mjs` with a test; keep Foundry globals out of those files.
 - **Converter output changes** (what players see): bump `CONTENT_VERSION` in `main.mjs` so stored player HTML is rebuilt once on the GM's next login.
 - **Data**: imported notes keep their vault path in `flags.planar-codex.path` and import hash in `flags.planar-codex.importHash`; frontmatter-derived flags live in `flags.planar-codex.meta`. Changing these needs a migration.
+- **Performance**: link resolution runs on every player's browser at every render. Typed links go through `buildNameLookup` / `pickByName` (`resolver.mjs`), cached per world collection (reset by the create/update/delete hooks in `main.mjs`) and per compendium (rebuilt when its index size changes). The note index is rebuilt only on create/delete/rename/move/flag changes; a text-only page update calls `linkIndex.invalidateBacklinks()`. The editor is imported lazily (`loadEditor` in `inline-edit.mjs`); keep `lib/codemirror.esm.js` out of the static import graph of `main.mjs`.
 - **Editor**: Live Preview decisions live in `computeDecorations` (pure, tested in `test/editor.test.mjs`). Block-level decorations that span lines (the Properties bar) must come from a StateField, not the view plugin.
 
 ## Versions

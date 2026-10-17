@@ -9,7 +9,15 @@
 import { MODULE_ID, getMarkdown, markdownUpdate, resolveAsset, localize, isCodexPage } from "./codex.mjs";
 import { linkIndex } from "./link-index.mjs";
 import { CodexAutocomplete, viewAdapter, warmPacks, fold } from "./autocomplete.mjs";
-import { createCodexEditor } from "./editor/editor.mjs";
+// The editor (CodeMirror, ~400 KB) is loaded on first use, not by every player at login.
+let editorModule = null;
+let editorLoading = null;
+/** Load the editor in the background; resolves when it's ready. */
+export function loadEditor() {
+  editorLoading ??= import("./editor/editor.mjs").then(m => { editorModule = m; return m; })
+    .catch(err => { editorLoading = null; throw err; });
+  return editorLoading;
+}
 import { findHeading, extractHeadings } from "./markdown.mjs";
 
 /** page uuid → InlineSession */
@@ -165,7 +173,7 @@ class InlineSession {
     this.#placeHost(container, root);
 
     const page = this.page;
-    this.editor = createCodexEditor({
+    this.editor = editorModule.createCodexEditor({
       parent: this.host.querySelector(".codex-editor-cm"),
       doc: this.base,
       line,
@@ -507,6 +515,12 @@ function applyRestore(page, root) {
  */
 export function editInPlace(page, at = {}) {
   if ( !page?.isOwner ) return false;
+  if ( !editorModule ) {
+    // First edit before the background load finished: open as soon as it's there.
+    loadEditor().then(() => editInPlace(page, at))
+      .catch(err => console.error(`${MODULE_ID} | the editor failed to load`, err));
+    return true;
+  }
   const existing = sessions.get(page.uuid);
   if ( existing?.host?.isConnected ) { existing.editor.view.focus(); return true; }
   existing?.close({ save: true });
@@ -535,6 +549,8 @@ export function onViewRendered(sheet, root) {
   if ( session ) session.remount(root);
   else applyRestore(page, root);
   if ( !page.isOwner ) return;
+  // Someone who can edit this note is looking at it: have the editor ready for the first double-click.
+  loadEditor().catch(err => console.warn(`${MODULE_ID} | the editor failed to load`, err));
 
   // A pencil on each heading: edit from there.
   for ( const h of root.querySelectorAll(":is(h1, h2, h3, h4, h5, h6)[data-codex-line]") ) {

@@ -116,3 +116,34 @@ export function linkReport(notes, { assetExists = () => true } = {}) {
   }
   return report;
 }
+
+/**
+ * A name → entries lookup for typed links ([[spell:Fireball]]): built once per collection or
+ * compendium index instead of normalising every name for every link on every render.
+ * @param {Iterable<{name: string}>} entries   in collection order
+ * @returns {Map<string, object[]>}
+ */
+export function buildNameLookup(entries) {
+  const map = new Map();
+  for ( const e of entries ) {
+    const key = normalizeKey(e?.name);
+    if ( !key ) continue;
+    const list = map.get(key);
+    if ( list ) list.push(e);
+    else map.set(key, [e]);
+  }
+  return map;
+}
+
+/**
+ * The entry for a name: the first one of the wanted type, else the first one with that name
+ * (the same choice the old linear search made).
+ * @param {Map<string, object[]>} lookup
+ * @param {string} key   already normalised
+ * @param {string} [type]
+ */
+export function pickByName(lookup, key, type = null) {
+  const list = lookup.get(key);
+  if ( !list ) return null;
+  return (type && list.find(e => e.type === type)) || list[0];
+}

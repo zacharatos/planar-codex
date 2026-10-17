@@ -2,7 +2,7 @@
  * Planar Codex — the live index of Codex notes in the world: link resolution, typed document lookup, backlinks.
  */
 import { MODULE_ID, isCodexPage, getMarkdown, folderTrail } from "./codex.mjs";
-import { NoteIndex } from "./resolver.mjs";
+import { NoteIndex, buildNameLookup, pickByName } from "./resolver.mjs";
 import { extractLinks, normalizeKey, normalizeHeading, findHeading, extractHeadings, TYPE_PREFIXES, isAssetTarget } from "./markdown.mjs";
 import { pathForNewNote } from "./vault.mjs";
 
@@ -11,9 +11,41 @@ class CodexLinkIndex {
   #backlinks = null;
   #dirty = true;
 
+  /** Typed-link lookups: world collections by document name, compendiums by pack id. */
+  #worldNames = new Map();
+  #packNames = new Map();
+
   invalidate() {
     this.#dirty = true;
     this.#backlinks = null;
+  }
+
+  /** Only a page's text changed: notes and names are the same, but its links may differ. */
+  invalidateBacklinks() {
+    this.#backlinks = null;
+  }
+
+  /** A world document of this type was created, renamed, retyped or deleted. */
+  invalidateTyped(docName) {
+    this.#worldNames.delete(docName);
+  }
+
+  #worldLookup(docName, collection) {
+    let hit = this.#worldNames.get(docName);
+    if ( !hit ) {
+      hit = buildNameLookup(collection);
+      this.#worldNames.set(docName, hit);
+    }
+    return hit;
+  }
+
+  async #packLookup(pack) {
+    const index = pack.indexed ? pack.index : await pack.getIndex({ fields: ["type"] });
+    const cached = this.#packNames.get(pack.collection);
+    if ( cached && cached.size === index.size ) return cached.lookup;
+    const lookup = buildNameLookup(index);
+    this.#packNames.set(pack.collection, { size: index.size, lookup });
+    return lookup;
   }
 
   /** Vault path of a page: the imported path, or one derived from its folders for notes made in Foundry. */
@@ -83,17 +115,14 @@ class CodexLinkIndex {
     const key = normalizeKey(name);
     const itemType = { spell: "spell", feat: "feat", weapon: "weapon", armor: "equipment", equipment: "equipment" }[prefix];
     const collection = game.collections.get(docName);
-    const local = collection?.find(d => normalizeKey(d.name) === key && (!itemType || d.type === itemType))
-      ?? collection?.find(d => normalizeKey(d.name) === key);
+    const local = collection ? pickByName(this.#worldLookup(docName, collection), key, itemType) : null;
     if ( local ) return local.uuid;
 
     const preferMonster = prefix === "monster" || prefix === "creature";
     const packs = game.packs.filter(p => p.documentName === docName)
       .sort((a, b) => packRank(b, preferMonster) - packRank(a, preferMonster));
     for ( const pack of packs ) {
-      const index = pack.indexed ? pack.index : await pack.getIndex({ fields: ["type"] });
-      const hit = index.find(e => normalizeKey(e.name) === key && (!itemType || e.type === itemType))
-        ?? index.find(e => normalizeKey(e.name) === key);
+      const hit = pickByName(await this.#packLookup(pack), key, itemType);
       if ( hit ) return hit.uuid ?? `Compendium.${pack.collection}.${docName}.${hit._id}`;
     }
     return null;

@@ -3,6 +3,21 @@
 All notable changes to this module. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 The release workflow uses the section matching the tag as the GitHub release notes, so keep the `## [x.y.z]` headings exact.
 
+## [0.4.0]
+
+### Added
+- **Planar Whispers.** With that module active, a private line (`> [!whisper] Name`) gets **Whisper**, which opens it full screen on the player's screen until they click it away, and **Queue**, which puts it in the Planar Whispers queue. A `player:` handout gets **Reveal to …**. Without Planar Whispers nothing changes: private lines are whispered in chat.
+- Callout options after a `|` (Obsidian callout metadata): `> [!whisper|voice|burn] Name`. Private lines use them for Planar Whispers (style, `burn`, `shiver`, `together=<name>` to send several lines at the same moment); other callouts keep rendering as before.
+- A private line can name several players: `> [!whisper] Ilsa, Brannoc`.
+
+### Changed
+- **The editor loads only when it's needed.** CodeMirror (~400 KB) used to be downloaded by every player at login; now it loads in the background when someone who can edit a note opens it, so players who never edit never download it.
+
+### Fixed
+- A callout written with options (`> [!note|wide]`) was shown as a plain quote; it now renders as its callout, in the reading view and in the editor.
+- **Typed links render much faster** (`[[spell:Fireball]]`, `[[actor:…]]`). Each link used to compare its name against every world document and every compendium entry, on every player's browser, every time a page was shown; a prep page with many links in a large world could freeze the browser for a moment. Names are now looked up in a table built once per collection or compendium and refreshed when names change.
+- **The link index is no longer rebuilt after every journal edit.** Pages rewritten by other modules (the Glitch Tracker, the casino ledger, the faction page) and ordinary text edits now only refresh the backlinks; the index is rebuilt when a note is added, removed, renamed or moved.
+
 ## [0.3.0]
 
 ### Added

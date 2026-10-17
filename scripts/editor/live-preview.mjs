@@ -21,7 +21,7 @@ import { WIKILINK_RE, FOUNDRY_RE } from "./syntax.mjs";
  * @property {(target: {kind: string, raw: string, link?: object}) => void} [openLink]  Ctrl/Cmd-click on a link.
  */
 
-const CALLOUT_RE = /^(\s*(?:>\s?)+)\[!([A-Za-z][\w-]*)\]([+-]?)[ \t]?/;
+const CALLOUT_RE = /^(\s*(?:>\s?)+)\[!([A-Za-z][\w-]*)(?:\|[^\]]*)?\]([+-]?)[ \t]?/;
 
 const CALLOUT_LABELS = { readaloud: "Read-aloud", dm: "DM only", whisper: "Private line", secret: "Secret" };
 const CALLOUT_ICONS = {

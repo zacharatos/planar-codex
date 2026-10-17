@@ -60,14 +60,17 @@ Journal sidebar (GM only) → **Import vault**, **Export vault**, **New note**.
 | Dice | `[[/r 2d6+3]]`, `[[/gmr 1d20]]`, `[[1d20]]` |
 | dnd5e checks, saves, damage | `[[/check skill=his dc=15]]`, `[[/save ability=dex dc=18]]`, `[[/damage 8d10 fire average]]`, `[[/heal 2d4]]`, `[[/attack +5]]`, `&Reference[prone]` |
 | Read-aloud box (Show to players / Post to chat buttons) | `> [!readaloud] Optional title` then `> text` |
-| Private line for one player (Whisper button) | `> [!whisper] Ilsa` then `> text` |
+| Private line for one player (Whisper button) | `> [!whisper] Ilsa` then `> text`; several players: `> [!whisper] Ilsa, Brannoc` |
+| … with [Planar Whispers](https://github.com/zacharatos/planar-whispers): full screen, a style, burn after reading, sent together | `> [!whisper\|voice\|burn] Ilsa`, `> [!whisper\|memory\|together=song] Ilsa` |
 | GM-only box (never sent to players) | `> [!dm] Optional title` then `> text` |
 | Secret (revealable) | `> [!secret]` then `> text` |
 | GM-only aside | `%%like this%%` |
 | Highlight | `==text==` |
 | Task (ticks in Foundry, saved to the note) | `- [ ] thing` |
 
-Other Obsidian callouts (`[!note]`, `[!warning]`, `[!tip]` …) render as coloured boxes; add `-` or `+` after the type to make one collapsible.
+Other Obsidian callouts (`[!note]`, `[!warning]`, `[!tip]` …) render as coloured boxes; add `-` or `+` after the type to make one collapsible. Obsidian callout options after a `|` (`[!note|wide]`) are kept and ignored, except on private lines (below).
+
+**With Planar Whispers active**, a private line gets **Whisper** (it opens full screen on the player's screen and stays until they click it away) and **Queue** (it waits in the Planar Whispers queue). Options after `|`: a style (`memory`, `voice`, `letter`, `vision`, `plain`), `burn`, `shiver`, `together=<name>`; private lines in the same note with the same `together` name are sent as one group, at the same moment. Handouts with `player:` also get **Reveal to …**: the note opens full screen as a letter. Without Planar Whispers, private lines are whispered in chat.
 
 ### Frontmatter the module reads
 
@@ -77,7 +80,7 @@ type: npc            # free text; shown in the properties box
 aliases: [Brannoc, Μπράνοκ]   # other names [[links]] can use
 tags: [tavern]
 actor: Brannoc         # the Foundry actor this note is about
-player: Ilsa Varn   # handouts: adds a "Share with Ilsa Varn" button
+player: Ilsa Varn   # handouts: adds a "Share with Ilsa Varn" button (and "Reveal to Ilsa Varn" with Planar Whispers)
 visibility: players  # imported as visible to all players (default: GM only)
 codex-import: false  # leave this note out of the import
 ---

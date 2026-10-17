@@ -119,9 +119,27 @@ async function refreshStoredContent() {
 /*  Keep the link index fresh                   */
 /* -------------------------------------------- */
 
-for ( const hook of ["createJournalEntry", "updateJournalEntry", "deleteJournalEntry",
-  "createJournalEntryPage", "updateJournalEntryPage", "deleteJournalEntryPage", "updateFolder"] ) {
+// Rebuilt lazily, on every client, at the next link that renders, so only rebuild when names,
+// folders or Codex flags change. Other modules rewrite their journal pages often (the Glitch
+// Tracker, the casino ledger, the faction page): a text-only change just resets the backlinks.
+for ( const hook of ["createJournalEntry", "deleteJournalEntry", "createJournalEntryPage", "deleteJournalEntryPage", "updateFolder"] ) {
   Hooks.on(hook, () => linkIndex.invalidate());
+}
+Hooks.on("updateJournalEntry", (entry, changes) => {
+  if ( ["name", "folder", "flags"].some(k => k in (changes ?? {})) ) linkIndex.invalidate();
+});
+Hooks.on("updateJournalEntryPage", (page, changes) => {
+  if ( ["name", "type", "flags"].some(k => k in (changes ?? {})) ) linkIndex.invalidate();
+  else if ( "text" in (changes ?? {}) ) linkIndex.invalidateBacklinks();
+});
+
+// Typed links ([[actor:…]], [[spell:…]]) look names up in world collections: refresh on name changes.
+for ( const docName of new Set(Object.values(markdown.TYPE_PREFIXES)) ) {
+  Hooks.on(`create${docName}`, () => linkIndex.invalidateTyped(docName));
+  Hooks.on(`delete${docName}`, () => linkIndex.invalidateTyped(docName));
+  Hooks.on(`update${docName}`, (doc, changes) => {
+    if ( "name" in (changes ?? {}) || "type" in (changes ?? {}) ) linkIndex.invalidateTyped(docName);
+  });
 }
 
 /* -------------------------------------------- */

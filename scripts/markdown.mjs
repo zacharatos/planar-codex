@@ -489,7 +489,8 @@ function renderProperties(data) {
 /*  DOM post-processing                         */
 /* -------------------------------------------- */
 
-const CALLOUT_RE = /^\s*\[!([A-Za-z][\w-]*)\]([+-]?)[ \t]*(.*)$/;
+// `[!type|options]± title`: the options after "|" are Obsidian callout metadata (Planar Whispers reads them on private lines).
+const CALLOUT_RE = /^\s*\[!([A-Za-z][\w-]*)(?:\|([^\]]*))?\]([+-]?)[ \t]*(.*)$/;
 
 function postProcess(root, { gm, revealed, notePath }) {
   // Callouts, innermost first.
@@ -525,6 +526,7 @@ function postProcess(root, { gm, revealed, notePath }) {
     aside.dataset.callout = kind;
     if ( bq.dataset.codexLine ) aside.dataset.codexLine = bq.dataset.codexLine;
     if ( info.title ) aside.dataset.title = info.titleText;
+    if ( info.meta ) aside.dataset.meta = info.meta;
     if ( info.fold === "+" ) aside.setAttribute("open", "");
     const header = doc.createElement(info.fold ? "summary" : "header");
     header.className = "codex-callout-title";
@@ -593,8 +595,8 @@ export function setCitationPrefixes(list) {
 }
 
 /**
- * Read `[!type]± title` from the first paragraph of a blockquote and detach the remaining body nodes.
- * @returns {null|{type: string, fold: string, title: string, titleText: string, body: Node[], bodyText: string}}
+ * Read `[!type|options]± title` from the first paragraph of a blockquote and detach the remaining body nodes.
+ * @returns {null|{type: string, meta: string, fold: string, title: string, titleText: string, body: Node[], bodyText: string}}
  */
 function readCalloutHeader(bq) {
   const first = Array.from(bq.children)[0];
@@ -626,7 +628,7 @@ function readCalloutHeader(bq) {
   const headText = holder.textContent;
   const m = headText.match(CALLOUT_RE);
   if ( !m ) return null;
-  const marker = headHTML.match(/\[![A-Za-z][\w-]*\][+-]?[ \t]*/);
+  const marker = headHTML.match(/\[![A-Za-z][\w-]*(?:\|[^\]]*)?\][+-]?[ \t]*/);
   const titleHTML = marker ? headHTML.slice(headHTML.indexOf(marker[0]) + marker[0].length).trim() : "";
 
   const body = [];
@@ -641,7 +643,7 @@ function readCalloutHeader(bq) {
     body.push(n);
   }
   const bodyText = body.map(n => n.textContent).join("\n");
-  return { type: m[1], fold: m[2], title: titleHTML, titleText: m[3].trim(), body, bodyText };
+  return { type: m[1], meta: (m[2] ?? "").trim(), fold: m[3], title: titleHTML, titleText: m[4].trim(), body, bodyText };
 }
 
 function calloutIcon(kind) {
