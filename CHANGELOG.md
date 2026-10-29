@@ -3,6 +3,20 @@
 All notable changes to this module. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 The release workflow uses the section matching the tag as the GitHub release notes, so keep the `## [x.y.z]` headings exact.
 
+## [0.4.1]
+
+0.4.0 was tagged but never published: its release workflow stopped before building. This release ships everything listed under 0.4.0.
+
+### Fixed
+- **Release workflow.** The step that required `module.json`'s version to match the tag is gone; the workflow stamps the version from the tag, as in the other Planar modules.
+
+### Changed
+- **Fewer database writes on import and after an update.** Re-importing the vault and the one-time refresh of stored notes after an update now save pages in batches (up to 40 per journal entry per call) instead of one call per page. Each call is a server round trip and a broadcast to every connected player, so a large re-import no longer floods the server.
+- CI and release workflows use `actions/checkout@v5` and `actions/setup-node@v5`; CI runs with read-only repository permissions.
+
+### Added
+- **Greek interface** (`lang/el.json`).
+
 ## [0.4.0]
 
 ### Added

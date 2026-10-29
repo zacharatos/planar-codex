@@ -13,6 +13,7 @@ import { createCodexNote, ensureRootFolder } from "./notes.mjs";
 import { editInPlace, editHereFromKeyboard } from "./inline-edit.mjs";
 import * as markdown from "./markdown.mjs";
 import * as vault from "./vault.mjs";
+import { updatePages } from "./batch.mjs";
 
 Hooks.once("init", () => {
   const register = (key, data) => game.settings.register(MODULE_ID, key, data);
@@ -100,17 +101,15 @@ function applyFontSize(px) {
 const CONTENT_VERSION = 2;
 async function refreshStoredContent() {
   if ( game.settings.get(MODULE_ID, "contentVersion") >= CONTENT_VERSION ) return;
-  let count = 0;
+  const changed = [];
   for ( const entry of game.journal ) {
     for ( const page of entry.pages ) {
       if ( !isCodexPage(page) ) continue;
       const { html } = convert(page.text?.markdown ?? "", { gm: false, page });
-      if ( html !== page.text?.content ) {
-        await page.update({ "text.content": html }, { diff: false });
-        count++;
-      }
+      if ( html !== page.text?.content ) changed.push({ page, data: { "text.content": html } });
     }
   }
+  const count = await updatePages(changed, { diff: false });
   await game.settings.set(MODULE_ID, "contentVersion", CONTENT_VERSION);
   if ( count ) ui.notifications.info(localize("Rebuilt", { count }));
 }

@@ -177,3 +177,18 @@ test("typed-link name lookup: normalised names, type preference, first match oth
   assert.equal(pickByName(lookup, "nobody"), null);
   assert.equal(lookup.size, 2, "empty names are skipped");
 });
+
+test("page updates are grouped by journal entry and cut into batches", async () => {
+  const { groupByParent } = await import("../scripts/batch.mjs");
+  const items = [
+    ...Array.from({ length: 5 }, (_, i) => ({ parentId: "A", update: { _id: `a${i}` } })),
+    { parentId: "B", update: { _id: "b0" } },
+    { parentId: "", update: { _id: "x" } },
+    { parentId: "B", update: {} }
+  ];
+  const groups = groupByParent(items, 2);
+  assert.deepEqual(groups.map(g => [g.parentId, g.updates.map(u => u._id)]), [
+    ["A", ["a0", "a1"]], ["A", ["a2", "a3"]], ["A", ["a4"]], ["B", ["b0"]]
+  ]);
+  assert.equal(groupByParent([]).length, 0);
+});

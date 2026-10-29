@@ -25,6 +25,11 @@
       "lang": "en",
       "name": "English",
       "path": "lang/en.json"
+    },
+    {
+      "lang": "el",
+      "name": "Ελληνικά",
+      "path": "lang/el.json"
     }
   ],
   "socket": true,

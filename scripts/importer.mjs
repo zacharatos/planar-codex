@@ -7,6 +7,7 @@ import { planImport, diffImport, stripRoot, summarizeFolders, DEFAULT_EXCLUDES, 
 import { linkReport } from "./resolver.mjs";
 import { normalizeKey, basename, escapeHTML, IMAGE_EXTENSIONS, contentHash } from "./markdown.mjs";
 import { linkIndex } from "./link-index.mjs";
+import { updatePages } from "./batch.mjs";
 
 const { ApplicationV2 } = foundry.applications.api;
 
@@ -215,9 +216,7 @@ export async function importVault(vault, { excludes, excludedFiles, onConflict =
     progress(localize("Import.Creating", { done: i, total: toCreate.length }));
     await JournalEntry.createDocuments(toCreate.slice(i, i + batch));
   }
-  for ( const { page, data } of toUpdate ) {
-    await page.update({ text: data.text, [`flags.${MODULE_ID}`]: data.flags[MODULE_ID] });
-  }
+  await updatePages(toUpdate.map(({ page, data }) => ({ page, data: { text: data.text, [`flags.${MODULE_ID}`]: data.flags[MODULE_ID] } })));
   linkIndex.invalidate();
 
   // Link report over everything now in the world plus the vault notes.
