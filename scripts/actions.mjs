@@ -112,3 +112,80 @@ export async function shareWith(page, who) {
   game.socket.emit(SOCKET, { action: "open-page", uuid: page.uuid, users: users.map(u => u.id) });
   ui.notifications.info(localize("Share.Done", { note: escapeHTML(entry.name), name: actor?.name ?? who }));
 }
+
+/* -------------------------------------------- */
+/*  Buttons on read-aloud and private-line boxes */
+/* -------------------------------------------- */
+
+/** The Planar Whispers API, when that module is active. */
+export function whispersApi() {
+  const mod = game.modules.get("planar-whispers");
+  return mod?.active ? mod.api ?? null : null;
+}
+
+/**
+ * Add the GM buttons to every read-aloud and private-line callout under `root`:
+ * Show / Post for read-aloud; Whisper / Queue (Planar Whispers) or a chat whisper for private lines.
+ * Used by the note sheet and by the Prompter's beat cards.
+ * @param {HTMLElement} root
+ * @param {object} [options]
+ * @param {string} [options.source]        The page uuid the lines come from (Planar Whispers keeps it).
+ * @param {(kind: string, box: HTMLElement) => void} [options.onUse]  Called after a button sends something ("readaloud" or "whisper"), with its box.
+ */
+export function decorateCallouts(root, { source = "", onUse = null } = {}) {
+  for ( const box of root.querySelectorAll(".codex-callout-readaloud, .codex-callout-whisper") ) {
+    if ( box.querySelector(":scope > .codex-callout-title .codex-actions") ) continue;
+    const title = box.querySelector(":scope > .codex-callout-title");
+    const body = box.querySelector(":scope > .codex-callout-content");
+    if ( !title || !body ) continue;
+    const kind = box.dataset.callout;
+    const label = box.dataset.title ?? "";
+    const actions = document.createElement("span");
+    actions.className = "codex-actions";
+    const used = result => { if ( result !== null && result !== undefined ) onUse?.(kind, box); return result; };
+    const btn = (icon, text, tip, fn) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "codex-action";
+      b.dataset.tooltip = tip;
+      b.setAttribute("aria-label", tip);
+      b.innerHTML = `<i class="${icon}"></i><span>${text}</span>`;
+      b.addEventListener("click", async ev => {
+        ev.preventDefault(); ev.stopPropagation();
+        try { used(await fn()); } catch(err) { ui.notifications.warn(err.message); }
+      });
+      actions.append(b);
+    };
+    if ( kind === "readaloud" ) {
+      btn("fa-solid fa-display", localize("ReadAloud.ShowShort"), localize("ReadAloud.Show"), () => (showToPlayers(label, body.innerHTML), true));
+      btn("fa-solid fa-comment", localize("ReadAloud.PostShort"), localize("ReadAloud.Post"), () => postToChat(label, body.innerHTML));
+    } else if ( kind === "whisper" ) {
+      const pw = whispersApi();
+      if ( pw?.fromCallouts ) {
+        const send = queue => pw.fromCallouts(whisperGroup(root, box, pw), { source, queue });
+        btn("fa-solid fa-paper-plane", localize("Whisper.Short"), localize("Whisper.FullScreen", { name: label || "?" }), () => send(false));
+        btn("fa-solid fa-hourglass-start", localize("Whisper.QueueShort"), localize("Whisper.Queue", { name: label || "?" }), () => send(true));
+      } else {
+        btn("fa-solid fa-paper-plane", localize("Whisper.Short"), localize("Whisper.Button", { name: label || "?" }), () => whisperTo(label, body.innerHTML));
+      }
+    }
+    title.append(actions);
+  }
+}
+
+/**
+ * A private line for Planar Whispers, with every other private line under `root` that shares its
+ * `together=<name>` option (they are sent as one group, at the same moment).
+ */
+function whisperGroup(root, box, pw) {
+  const one = b => ({
+    targets: b.dataset.title ?? "",
+    meta: b.dataset.meta ?? "",
+    html: b.querySelector(":scope > .codex-callout-content")?.innerHTML ?? ""
+  });
+  const together = pw.parseMeta(box.dataset.meta ?? "").together;
+  if ( !together ) return [one(box)];
+  return Array.from(root.querySelectorAll(".codex-callout-whisper"))
+    .filter(b => pw.parseMeta(b.dataset.meta ?? "").together === together)
+    .map(one);
+}

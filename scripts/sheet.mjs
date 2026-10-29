@@ -10,17 +10,12 @@
 import { MODULE_ID, convert, getMarkdown, markdownUpdate, updateMarkdown, isCodexPage, localize, FORMAT_MARKDOWN } from "./codex.mjs";
 import { linkIndex } from "./link-index.mjs";
 import { toggleTask, escapeHTML, splitFrontmatter, fmList } from "./markdown.mjs";
-import { showToPlayers, postToChat, whisperTo, shareWith } from "./actions.mjs";
+import { shareWith, decorateCallouts, whispersApi } from "./actions.mjs";
 import { attachAutocomplete } from "./autocomplete.mjs";
 import { onViewRendered, interceptEdit, editInPlace, contentContainer } from "./inline-edit.mjs";
+import { decorateBeats } from "./prompter/beats-in-note.mjs";
 
 const Base = foundry.applications.sheets.journal.JournalEntryPageMarkdownSheet;
-
-/** The Planar Whispers API, when that module is active. */
-function whispersApi() {
-  const mod = game.modules.get("planar-whispers");
-  return mod?.active ? mod.api ?? null : null;
-}
 
 export class CodexMarkdownSheet extends Base {
   static DEFAULT_OPTIONS = {
@@ -90,67 +85,12 @@ export class CodexMarkdownSheet extends Base {
     }
     root.classList.add("planar-codex", "codex-page");
     if ( game.user.isGM ) {
-      this.#decorateCallouts(root);
+      decorateCallouts(root, { source: this.document.uuid });
+      decorateBeats(this.document, root);
       this.#insertToolbar(root);
     }
     this.#activateTasks(root);
     onViewRendered(this, root);
-  }
-
-  /** Buttons on read-aloud and private-line callouts. */
-  #decorateCallouts(root) {
-    for ( const box of root.querySelectorAll(".codex-callout-readaloud, .codex-callout-whisper") ) {
-      if ( box.querySelector(":scope > .codex-callout-title .codex-actions") ) continue;
-      const title = box.querySelector(":scope > .codex-callout-title");
-      const body = box.querySelector(":scope > .codex-callout-content");
-      if ( !title || !body ) continue;
-      const kind = box.dataset.callout;
-      const label = box.dataset.title ?? "";
-      const actions = document.createElement("span");
-      actions.className = "codex-actions";
-      const btn = (icon, text, tip, fn) => {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "codex-action";
-        b.dataset.tooltip = tip;
-        b.setAttribute("aria-label", tip);
-        b.innerHTML = `<i class="${icon}"></i><span>${text}</span>`;
-        b.addEventListener("click", ev => { ev.preventDefault(); ev.stopPropagation(); fn(); });
-        actions.append(b);
-      };
-      if ( kind === "readaloud" ) {
-        btn("fa-solid fa-display", localize("ReadAloud.ShowShort"), localize("ReadAloud.Show"), () => showToPlayers(label, body.innerHTML));
-        btn("fa-solid fa-comment", localize("ReadAloud.PostShort"), localize("ReadAloud.Post"), () => postToChat(label, body.innerHTML));
-      } else if ( kind === "whisper" ) {
-        const pw = whispersApi();
-        if ( pw?.fromCallouts ) {
-          const send = queue => pw.fromCallouts(this.#whisperGroup(root, box, pw), { source: this.document.uuid, queue })
-            .catch(err => ui.notifications.warn(err.message));
-          btn("fa-solid fa-paper-plane", localize("Whisper.Short"), localize("Whisper.FullScreen", { name: label || "?" }), () => send(false));
-          btn("fa-solid fa-hourglass-start", localize("Whisper.QueueShort"), localize("Whisper.Queue", { name: label || "?" }), () => send(true));
-        } else {
-          btn("fa-solid fa-paper-plane", localize("Whisper.Short"), localize("Whisper.Button", { name: label || "?" }), () => whisperTo(label, body.innerHTML));
-        }
-      }
-      title.append(actions);
-    }
-  }
-
-  /**
-   * A private line for Planar Whispers, with every other private line in the note that shares its
-   * `together=<name>` option (they are sent as one group, at the same moment).
-   */
-  #whisperGroup(root, box, pw) {
-    const one = b => ({
-      targets: b.dataset.title ?? "",
-      meta: b.dataset.meta ?? "",
-      html: b.querySelector(":scope > .codex-callout-content")?.innerHTML ?? ""
-    });
-    const together = pw.parseMeta(box.dataset.meta ?? "").together;
-    if ( !together ) return [one(box)];
-    return Array.from(root.querySelectorAll(".codex-callout-whisper"))
-      .filter(b => pw.parseMeta(b.dataset.meta ?? "").together === together)
-      .map(one);
   }
 
   /** GM toolbar: edit in place, and share a handout with the player(s) named in `player:` frontmatter. */

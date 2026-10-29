@@ -3,6 +3,24 @@
 All notable changes to this module. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 The release workflow uses the section matching the tag as the GitHub release notes, so keep the `## [x.y.z]` headings exact.
 
+## [0.5.0]
+
+### Added
+- **Prompter** (Υποβολέας): a GM panel that runs the session from a deck of beats written in a run-sheet note as `> [!beat|priority|at=…|pc=…|ledger=…|missed=…] Title` callouts.
+  - Sections: *Never forget* (`must` beats until played), *Now* (beats something at the table just called for), *The deck*, *Listen for*, beats asleep because their heroes are absent, and what was done tonight.
+  - Beats are matched by name against Planar Theater places, NPC cards and title cards (on the stage or over the map), Planar Atlas stops and parts of the day, the active scene; and by moment against session start, Short and Long Rests (dnd5e), combat ending and deaths (Planar Glitch). A notification (and an optional chime) for the GM.
+  - Cards show the beat's body with rolls, links, read-aloud and private-line buttons. When every private line on a card has been sent from it, the beat is marked played (setting).
+  - Spotlight per hero (beats played, private lines sent, notes), elapsed time and the Planar Atlas clock.
+  - Quick notes with tags (Alt+N). A feed of what the other modules saw: private lines sent and read, purse changes, road stops, Heroic Inspiration, deaths and returns, rests, combats.
+  - Start and Close the session. Closing asks the run sheet's close-out questions and writes a **Session NN - live log** note with the deck (played, skipped, missed with the next count), the spotlight, the notes, the events and the answers.
+  - Starting tells Planar Atlas and Planar Whispers the session number.
+  - API: `game.modules.get("planar-codex").api.prompter`.
+- Beat callouts in the reading view show their state with ✓ / ✗ / undo buttons and open the Prompter.
+
+### Changed
+- `[!beat]` callouts are GM-only, like `[!dm]` and `[!whisper]`: they are left out of the stored player HTML. Stored notes are re-rendered once on the GM's next login.
+- The read-aloud and private-line buttons are shared by the note sheet and the Prompter's cards (`decorateCallouts` in `actions.mjs`).
+
 ## [0.4.1]
 
 0.4.0 was tagged but never published: its release workflow stopped before building. This release ships everything listed under 0.4.0.

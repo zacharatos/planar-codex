@@ -48,6 +48,42 @@ Journal sidebar (GM only) → **Import vault**, **Export vault**, **New note**.
 - **Text size:** Configure Settings → Planar Codex → Codex text size (per computer).
 - **Export vault:** downloads a zip of the notes changed since import (or all), with the vault's folder layout. Unzip it over the vault.
 
+## Prompter: run the session from a deck
+
+The **Prompter** is a GM-only panel beside the canvas that keeps tonight's important moments in front of you. Open it from the scroll button in the Tokens toolbar, with **Alt+D**, or **Alt+N** to jump straight into a quick note.
+
+1. **Write the deck** in a run-sheet note as beat callouts, one per moment that must not be forgotten:
+
+   ```markdown
+   > [!beat|should|at=The Old Library; the archivist; any official paper|pc=Ilsa, Brannoc|ledger=8,53|missed=1] The forged deed
+   >
+   > Search [[/check ability=int skill=inv dc=18]], or pay the archivist 5 gp.
+   >
+   > > [!whisper|memory] Ilsa
+   > >
+   > > «You have seen this handwriting before.»
+   ```
+
+   - The first option is the priority: `must` (pinned until played), `should`, `fit` (if it fits), `watch` (something a player may say).
+   - `at=`: the moments to play it, separated by `;`. Names (a place, an NPC, a scene, a part of the day) and the moments `session start`, `table open`, `Long Rest`, `Short Rest`, `after combat`, `death`, `night`. Moments like "any meal" are shown but never matched automatically.
+   - `pc=`: the heroes it is for. When none of them is played by someone logged in, the beat sleeps.
+   - `ledger=` and `missed=`: your own numbering, shown on the card.
+   - The body is ordinary Codex Markdown: rolls, links, read-aloud and private lines (with their Whisper buttons) all work on the card.
+   - Beats are GM-only, like `[!dm]`. In the note they show ✓ / ✗ buttons and whether they were played.
+
+2. **Start the session** in the panel. The Prompter listens, and when something at the table matches a beat it moves it to **Now**, with a notification (and a chime, if you want one):
+   - **Planar Theater**: a place, an NPC card or a title card shown, on the stage or over the map.
+   - **Planar Atlas**: the party arrives at a place; the part of the day changes.
+   - A scene activated, a combat ending, a Short or Long Rest (dnd5e), a death (Planar Glitch).
+
+3. **Play** what comes up and tick it: ✓ played, ✗ not tonight, ⏩ later. When every private line on a card has been sent from it, the beat is marked played. The **spotlight** row counts beats, private lines and notes per hero, so you can see who hasn't had a moment yet.
+
+4. **Notes:** type in the box at the bottom, with tags (`#canon`, `#npc`, `#paid`, `#ruling`, `#quote`, `#loot`, `#hi`, `#idea` or your own). The feed also records what the modules saw: private lines sent and read (Planar Whispers), coins in and out of the common purse and every stop on the road (Planar Atlas), Heroic Inspiration given and used, deaths and returns (Planar Glitch), rests and combats.
+
+5. **Close the session.** You answer the numbered questions under a heading called **Close-out** in the run sheet, and the Prompter writes a note **Session NN - live log** (in a `Sessions` folder if the Codex has one): the deck with what was played, skipped or missed (with the next miss count), the spotlight, your notes, the module events and your answers. It exports with the vault like any note.
+
+The Prompter tells Planar Atlas and Planar Whispers which session it is when you start, so their logs carry the number. None of the other modules is required.
+
 ## Syntax
 
 | You want | Write |
@@ -63,6 +99,7 @@ Journal sidebar (GM only) → **Import vault**, **Export vault**, **New note**.
 | Private line for one player (Whisper button) | `> [!whisper] Ilsa` then `> text`; several players: `> [!whisper] Ilsa, Brannoc` |
 | … with [Planar Whispers](https://github.com/zacharatos/planar-whispers): full screen, a style, burn after reading, sent together | `> [!whisper\|voice\|burn] Ilsa`, `> [!whisper\|memory\|together=song] Ilsa` |
 | GM-only box (never sent to players) | `> [!dm] Optional title` then `> text` |
+| A beat for the Prompter (GM only) | `> [!beat\|must\|at=place; first Long Rest\|pc=Ilsa\|ledger=4] Title` then `> body` |
 | Secret (revealable) | `> [!secret]` then `> text` |
 | GM-only aside | `%%like this%%` |
 | Highlight | `==text==` |
@@ -88,7 +125,7 @@ codex-import: false  # leave this note out of the import
 
 ## What players see
 
-The page's stored HTML is the player version: `[!dm]` and `[!whisper]` boxes, `%%comments%%` and frontmatter are left out entirely. Only the GM view renders them, from the Markdown. Notes import as GM-only unless `visibility: players` is set.
+The page's stored HTML is the player version: `[!dm]`, `[!whisper]` and `[!beat]` boxes, `%%comments%%` and frontmatter are left out entirely. Only the GM view renders them, from the Markdown. Notes import as GM-only unless `visibility: players` is set.
 
 ## Settings
 
@@ -101,8 +138,12 @@ The page's stored HTML is the player version: `[!dm]` and `[!whisper]` boxes, `%
 | Codex text size | per computer | Body text size of Codex notes |
 | Edit notes in place | per computer | Foundry's edit control opens the in-place editor instead of a window |
 | Double-click to edit | per computer | Double-click a paragraph to edit it |
+| Prompter: notifications | per computer | A notification when something at the table calls for a beat |
+| Prompter: chime | per computer | A soft sound with those notifications |
+| Prompter: sending its private lines plays a beat | world | When every private line on a beat card has been sent from the card, the beat is marked played |
+| Prompter: open at login | per computer | Opens the Prompter when you log in while a session is running |
 
-Keybinding: *Configure Controls → Planar Codex → Edit the note here* (Ctrl+E by default).
+Keybindings: *Configure Controls → Planar Codex → Edit the note here* (Ctrl+E by default), *Prompter: show or hide* (Alt+D), *Prompter: quick note* (Alt+N).
 
 ## Contributing and development
 

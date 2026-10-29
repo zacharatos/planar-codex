@@ -24,11 +24,18 @@ scripts/
   actions.mjs            Show to players, Post to chat, whisper, share; module socket
   notes.mjs              create notes, the Codex root folder
   zip.mjs                tiny ZIP writer used by the exporter
+  prompter/
+    core.mjs             pure: parse beats and close-out questions, match triggers, notes, the live log Markdown (unit-tested)
+    state.mjs            the `prompter` world setting (current run sheet, one run per sheet), coalesced writes, who is present, spotlight
+    context.mjs          hooks: Theater, Atlas, Whispers, Glitch, scenes, rests, combat, inspiration → hot beats and events
+    panel.mjs            the GM panel (ApplicationV2), Start / Close, writing the live log, jump to a beat in the sheet
+    beats-in-note.mjs    state and buttons on beat callouts in the reading view
+    index.mjs            settings, keybindings, toolbar button, the `api.prompter` object
 styles/codex.css         reading view, editor and window styles
 lang/en.json             interface strings (keys under PLANARCODEX.*)
 lib/                     vendored browser builds: codemirror.esm.js, marked.esm.js (+ licences)
 lib-src/codemirror.mjs   the CodeMirror entry point lib/codemirror.esm.js is built from
-test/                    node:test unit tests, helpers, and the browser harness (test/harness/)
+test/                    node:test unit tests, helpers, and the browser harnesses (test/harness/: note view, prompter.html)
 tools/                   package, stamp-manifest, release-api, build-lib, serve, vault-check, heading-check
 .github/workflows/       ci.yml, release.yml
 ```
@@ -108,6 +115,17 @@ Reading view (as GM, then as a player)
 - Secrets reveal and stay revealed after the note is edited.
 - Tasks tick and the tick survives a reload.
 - As a player: no DM boxes, private lines, comments, properties, pencils or Edit button.
+
+Prompter (harness first: `npm run harness`, then /test/harness/prompter.html; `window.prompter.hear({kind: "place", text: "The Old Library"})` in the console)
+- A note with `[!beat]` callouts: the toolbar scroll button and Alt+D open the Prompter on it; the list button switches sheets.
+- Start: the `must` beats glow, a notification lists them; Planar Atlas's party window shows the session number; a sent whisper carries it.
+- Show a Theater place whose label contains a beat's `at=` name (stage, then over a map): the beat moves to *Now* with a notification. Move the Atlas party to a place: same. Take a Long Rest on a hero: `first Long Rest` beats come up.
+- Expand a card: rolls roll, links open, Whisper sends; once every private line on the card is sent, the beat is marked played, Show reads aloud.
+- ✓ / ✗ / ⏩ / undo, in the panel and on the beat box in the note: both stay in step.
+- Log out the player of a hero named in `pc=`: the beat moves to *Waiting for absent heroes*.
+- Notes with tags; delete one. The feed shows whispers sent and read, purse changes, stops, Heroic Inspiration, deaths.
+- Close: the dialog asks the close-out questions; a *Session NN - live log* note appears (in *Sessions* if there is one) and opens. Write it again from the header button: the same note is updated.
+- As a player: no toolbar button, no beat boxes in any note, Alt+D does nothing.
 
 Editing
 - Double-click a paragraph, a list item, a line inside a callout and a table row: the editor opens at that line, at the same height on screen.

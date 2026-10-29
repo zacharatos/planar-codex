@@ -14,6 +14,7 @@ import { editInPlace, editHereFromKeyboard } from "./inline-edit.mjs";
 import * as markdown from "./markdown.mjs";
 import * as vault from "./vault.mjs";
 import { updatePages } from "./batch.mjs";
+import { initPrompter, readyPrompter, prompterApi } from "./prompter/index.mjs";
 
 Hooks.once("init", () => {
   const register = (key, data) => game.settings.register(MODULE_ID, key, data);
@@ -62,6 +63,7 @@ Hooks.once("init", () => {
   });
 
   registerEnrichers();
+  initPrompter();
 
   game.keybindings.register(MODULE_ID, "editHere", {
     name: "PLANARCODEX.Keybindings.EditHere",
@@ -75,6 +77,7 @@ Hooks.once("init", () => {
     linkIndex, convert, markdown, vault,
     importVault, collectNotes, createCodexNote, ensureRootFolder,
     showToPlayers, postToChat, whisperTo, shareWith, editInPlace,
+    prompter: prompterApi,
     openImporter: () => new CodexImporter().render({ force: true }),
     openExporter: () => new CodexExporter().render({ force: true })
   };
@@ -88,6 +91,7 @@ Hooks.once("ready", async () => {
   registerSocket();
   applyFontSize(game.settings.get(MODULE_ID, "fontSize"));
   if ( game.user === game.users.activeGM ) await refreshStoredContent();
+  readyPrompter();
 });
 
 function applyFontSize(px) {
@@ -98,7 +102,7 @@ function applyFontSize(px) {
  * When a new module version renders notes differently, re-render the stored (player) HTML of every Codex note once.
  * Bump CONTENT_VERSION whenever convertMarkdown's output changes.
  */
-const CONTENT_VERSION = 2;
+const CONTENT_VERSION = 3;
 async function refreshStoredContent() {
   if ( game.settings.get(MODULE_ID, "contentVersion") >= CONTENT_VERSION ) return;
   const changed = [];

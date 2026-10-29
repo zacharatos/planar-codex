@@ -1,0 +1,96 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!-- Prompter harness: the panel with stubbed Foundry globals. `npm run harness`, then /test/harness/prompter.html -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="stylesheet" href="../../styles/codex.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #0e0d0c; color: #ddd; font-family: Roboto, sans-serif; }
+  .application { position: absolute; display: flex; flex-direction: column; background: #1b1916; border: 1px solid #444; border-radius: 6px; overflow: hidden; }
+  .application .window-header { padding: 6px 10px; font: 600 13px sans-serif; color: #ccc; border-bottom: 1px solid #333; }
+  .application .window-content { flex: 1; overflow-y: auto; }
+  button { background: #2a2722; color: #ddd; border: 1px solid #555; border-radius: 4px; cursor: pointer; }
+  input { background: #111; color: #eee; border: 1px solid #555; border-radius: 4px; padding: 0 6px; }
+  #toasts { position: fixed; top: 6px; left: 6px; font: 12px sans-serif; color: #f2c14e; }
+</style></head>
+<body><div id="toasts"></div>
+<script type="module">
+  const lang = await (await fetch("../../lang/en.json")).json();
+  const get = (o, k) => k.split(".").reduce((a, b) => a?.[b], o);
+  const settings = new Map([["planar-codex.rootFolder", ""], ["planar-codex.prompterToasts", true], ["planar-codex.prompterChime", false],
+    ["planar-codex.prompterWhisperPlays", true], ["planar-codex.prompterAutoOpen", true], ["planar-codex.prompter", {}]]);
+  const hooks = {};
+  window.Hooks = { on: (n, f) => (hooks[n] ??= []).push(f), once: (n, f) => (hooks[n] ??= []).push(f), callAll: (n, ...a) => (hooks[n] ?? []).forEach(f => f(...a)) };
+  window.ui = { notifications: { info: m => { document.getElementById("toasts").textContent = m; console.log("INFO", m); }, warn: m => console.log("WARN", m) } };
+  window.CONST = { DOCUMENT_OWNERSHIP_LEVELS: { NONE: 0, OBSERVER: 2, OWNER: 3 } };
+  window.CONFIG = { TextEditor: { enrichers: [] } };
+  const clone = v => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
+  class ApplicationV2 {
+    constructor(options = {}) { this.options = { ...this.constructor.DEFAULT_OPTIONS, ...options }; this.rendered = false; }
+    async render({ position } = {}) {
+      if ( !this.element ) {
+        this.element = document.createElement("div");
+        this.element.className = `application ${(this.options.classes ?? []).join(" ")}`;
+        const p = position ?? this.options.position;
+        Object.assign(this.element.style, { left: `${p.left ?? 820}px`, top: `${p.top ?? 20}px`, width: `${p.width}px`, height: `${p.height}px` });
+        this.element.innerHTML = `<header class="window-header">${this.title}</header><section class="window-content"></section>`;
+        document.body.append(this.element);
+        this._onFirstRender?.({}, {});
+      }
+      const html = await this._renderHTML();
+      this._replaceHTML(html, this.element.querySelector(".window-content"));
+      this.rendered = true;
+      await this._onRender?.({}, {});
+      return this;
+    }
+    close() { this.element?.remove(); this.element = null; this.rendered = false; this._onClose?.({}); }
+  }
+  const DialogV2 = { prompt: async () => window.dialogAnswer ?? null };
+  window.foundry = {
+    applications: { api: { ApplicationV2, DialogV2 }, ux: { TextEditor: { implementation: { enrichHTML: async h => h.replace(/\[\[\/check ([^\]]+)\]\]/g, '<a class="roll-link"><i class="fa-solid fa-dice-d20"></i> $1</a>') } } } },
+    utils: { deepClone: clone, randomID: () => Math.random().toString(36).slice(2, 10), getProperty: (o, k) => k.split(".").reduce((a, b) => a?.[b], o), hasProperty: (o, k) => k.split(".").reduce((a, b) => a?.[b], o) !== undefined },
+    audio: { AudioHelper: { play() {} } }
+  };
+  const params = new URLSearchParams(location.search);
+  const md = await (await fetch(params.get("sheet") ?? "run-sheet.md")).text();
+  const page = { id: "rs", name: "Session 07 - run sheet", uuid: "JournalEntry.rs.JournalEntryPage.rs", documentName: "JournalEntryPage", type: "text",
+    text: { markdown: md, content: "" }, flags: { "planar-codex": { path: "Prep/Session 07 - run sheet.md" } },
+    getFlag(s, k) { return s === "core" ? (k === "sheetClass" ? "planar-codex.CodexMarkdownSheet" : null) : this.flags[s]?.[k]; } };
+  page.parent = { name: page.name, pages: [page], sheet: { render() {} } };
+  const users = [
+    { id: "gm", name: "GM", isGM: true, active: true },
+    { id: "u1", name: "Anna", isGM: false, active: true }, { id: "u2", name: "Bob", isGM: false, active: true },
+    { id: "u3", name: "Cleo", isGM: false, active: true }, { id: "u4", name: "Dan", isGM: false, active: false }];
+  users.activeGM = users[0];
+  const mkActor = (name, owner) => ({ name, type: "character", hasPlayerOwner: true, id: name, testUserPermission: u => u.id === owner });
+  // ?heroes=Name A,Name B,…  (the last one's player is offline)
+  const names = params.get("heroes")?.split(",") ?? ["Ilsa Varn", "Brannoc", "Mara", "Kael"];
+  while ( users.length < names.length + 1 ) users.push({ id: `u${users.length}`, name: `P${users.length}`, isGM: false, active: true });
+  users.forEach((u, i) => { if ( i ) u.active = i < names.length; });
+  const actors = names.map((n, i) => mkActor(n, `u${i + 1}`));
+  window.game = {
+    user: users[0], users, actors, journal: [page.parent], folders: [],
+    settings: { register(m, k, d) { if ( !settings.has(`${m}.${k}`) ) settings.set(`${m}.${k}`, d.default); }, get: (m, k) => clone(settings.get(`${m}.${k}`)), set: async (m, k, v) => { settings.set(`${m}.${k}`, clone(v)); }, settings },
+    keybindings: { register() {} },
+    modules: { get: id => (id === "planar-whispers" ? { active: true, api: { parseMeta: () => ({}), fromCallouts: async items => { window.sentWhispers = [...(window.sentWhispers ?? []), ...items]; return { ok: true }; } } } : id === "planar-atlas" ? { active: true, api: { clockLabel: () => "Day 1 · 10:20 · morning", road: () => ({ journeys: [], active: null }), purseLog: () => [], clock: () => ({ band: "morning" }) } } : null) },
+    i18n: { localize: k => get(lang, k) ?? k, format: (k, d) => (get(lang, k) ?? k).replace(/\{(\w+)\}/g, (_, x) => d[x]) }
+  };
+  window.fromUuidSync = uuid => (uuid === page.uuid ? page : null);
+  // Notes the Prompter creates (the live log).
+  window.created = [];
+  window.Folder = { create: async d => ({ id: "root", ...d }) };
+  window.JournalEntry = { create: async data => {
+    const p = { ...data.pages[0], id: "log", uuid: "JournalEntry.log.JournalEntryPage.log", documentName: "JournalEntryPage",
+      getFlag(s, k) { return s === "core" ? (k === "sheetClass" ? "planar-codex.CodexMarkdownSheet" : null) : this.flags[s]?.[k]; },
+      update: async d => { p.text.markdown = d["text.markdown"]; } };
+    const entry = { name: data.name, pages: [p], sheet: { render() {} } };
+    entry.pages.contents = entry.pages; entry.pages.find = Array.prototype.find.bind(entry.pages);
+    p.parent = entry; window.created.push(p); game.journal.push(entry); return entry;
+  } };
+  const P = await import("../../scripts/prompter/index.mjs");
+  P.initPrompter();
+  P.readyPrompter();
+  window.prompter = P.prompterApi;
+  window.hooks = hooks;
+  await P.prompterApi.open();
+  window.ready = true;
+</script></body></html>

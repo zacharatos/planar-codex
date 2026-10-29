@@ -23,7 +23,15 @@
       "DblclickEdit": "Double-click to edit",
       "DblclickEditHint": "Double-click a paragraph, list item or callout in a Codex note to edit it right there.",
       "CitationPrefixes": "Citation prefixes",
-      "CitationPrefixesHint": "Inline code starting with one of these (comma separated) shows as a small book reference instead of code, e.g. `PHB, Ch. 7 › Fireball`. A prefix containing a backslash is read as a regular expression."
+      "CitationPrefixesHint": "Inline code starting with one of these (comma separated) shows as a small book reference instead of code, e.g. `PHB, Ch. 7 › Fireball`. A prefix containing a backslash is read as a regular expression.",
+      "PrompterToasts": "Prompter: notifications",
+      "PrompterToastsHint": "When something at the table calls for a beat (a Theater place, the party arriving somewhere, a Long Rest), show a notification to the GM on this computer.",
+      "PrompterChime": "Prompter: chime",
+      "PrompterChimeHint": "Play a soft sound with those notifications, on this computer only.",
+      "PrompterWhisperPlays": "Prompter: sending its private lines plays a beat",
+      "PrompterWhisperPlaysHint": "When every private line on a beat card has been sent from the card, the beat is marked played.",
+      "PrompterAutoOpen": "Prompter: open at login",
+      "PrompterAutoOpenHint": "Open the Prompter when you log in while a session is running."
     },
     "Import": {
       "Title": "Import Obsidian vault",
@@ -126,7 +134,11 @@
     "Rebuilt": "Planar Codex refreshed {count} notes for the new version.",
     "Keybindings": {
       "EditHere": "Planar Codex: edit the note here",
-      "EditHereHint": "Open the Codex editor at the part of the note you are looking at (press again, or Esc, to finish)."
+      "EditHereHint": "Open the Codex editor at the part of the note you are looking at (press again, or Esc, to finish).",
+      "Prompter": "Prompter: show or hide",
+      "PrompterHint": "Open or close the Prompter panel (the session's deck).",
+      "PrompterNote": "Prompter: quick note",
+      "PrompterNoteHint": "Open the Prompter with the cursor in the note box."
     },
     "Editor": {
       "Done": "Done",
@@ -150,6 +162,83 @@
         "dirty": "Unsaved changes",
         "saving": "Saving…",
         "error": "Not saved"
+      }
+    },
+    "Prompter": {
+      "Title": "Prompter",
+      "Toast": "Prompter: {titles} ({where})",
+      "NoSheet": "No run sheet with beats yet. Write the session's deck as [!beat] callouts in a Codex note, then pick it here.",
+      "PickSheet": "Choose the run sheet",
+      "Sheet": "Run sheet",
+      "Use": "Use it",
+      "OpenSheet": "Open the run sheet",
+      "WriteLog": "Write the live log now",
+      "Start": "Start the session",
+      "Reopen": "Reopen the session",
+      "Close": "Close the session",
+      "StartHint": "Press Start when the players are in: the Prompter starts listening and logging.",
+      "ClosedHint": "This session is closed. Its live log is written; Reopen if you keep playing.",
+      "Elapsed": "Time since the session started",
+      "WorldClock": "In-world time (Planar Atlas)",
+      "SessionN": "Session {n}",
+      "Spotlight": "Spotlight tonight: beats played, private lines sent and notes per hero. Click a name to start a note.",
+      "SpotlightTip": "{name}: click to start a note about them",
+      "Absent": "{name} is not at the table tonight",
+      "MustDone": "Nothing left that must happen.",
+      "DeckEmpty": "The deck is empty.",
+      "MissedTip": "Missed {n} time(s) already",
+      "Played": "Played",
+      "Skip": "Not tonight",
+      "Later": "Later",
+      "Reset": "Undo",
+      "Jump": "Show in the run sheet",
+      "NotNow": "not now",
+      "Open": "Open the Prompter",
+      "NoBody": "Nothing more in this beat.",
+      "ByWhisper": "sent as a private line",
+      "NotePlaceholder": "Note… #canon #npc #paid #ruling #quote",
+      "AddNote": "Add the note",
+      "DeleteNote": "Delete the note",
+      "LogWritten": "Prompter: {name} written.",
+      "CloseTitle": "Close the session",
+      "CloseIntro": "Beats not played tonight: {open}. They go back in the deck next time. Answer what only you know, then the live log is written.",
+      "CloseMust": "Still not played, and they must: {titles}",
+      "CloseOk": "Close and write the log",
+      "Section": {
+        "Must": "Never forget",
+        "Now": "Now",
+        "Deck": "The deck",
+        "Watch": "Listen for",
+        "Sleeping": "Waiting for absent heroes",
+        "Done": "Done tonight",
+        "Feed": "Notes and what the modules saw"
+      },
+      "Source": {
+        "Theater": "Theater",
+        "Scene": "Scene",
+        "Atlas": "Atlas",
+        "Clock": "Time",
+        "Combat": "Combat",
+        "Rest": "Rest",
+        "Inspiration": "Heroic Inspiration",
+        "Purse": "Purse",
+        "Glitch": "Glitch",
+        "Whisper": "Whisper",
+        "Prompter": "Prompter"
+      },
+      "Event": {
+        "Started": "session started",
+        "Closed": "session closed",
+        "CombatStart": "started: {names}",
+        "CombatEnd": "ended after {rounds} rounds",
+        "LongRest": "{name}: Long Rest",
+        "ShortRest": "{name}: Short Rest",
+        "InspirationGiven": "{name} gets it",
+        "InspirationUsed": "{name} uses it",
+        "Death": "{name} died (death {n}): {cause}",
+        "Return": "{name} is back · {glitches}",
+        "Read": "{name} read «{what}»",
+        "Day": "Day {day}"
       }
     }
   }

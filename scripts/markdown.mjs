@@ -6,6 +6,8 @@
  * this module turns it into the HTML Foundry stores and displays.
  */
 
+import { parseBeatMeta } from "./prompter/core.mjs";
+
 /* -------------------------------------------- */
 /*  Constants                                   */
 /* -------------------------------------------- */
@@ -32,8 +34,12 @@ export const CALLOUT_ALIASES = {
   readaloud: "readaloud", "read-aloud": "readaloud", read: "readaloud", boxed: "readaloud", boxedtext: "readaloud",
   dm: "dm", gm: "dm", "dm-only": "dm", dmonly: "dm", private: "dm",
   secret: "secret", reveal: "secret",
-  whisper: "whisper", "private-line": "whisper", note2player: "whisper"
+  whisper: "whisper", "private-line": "whisper", note2player: "whisper",
+  beat: "beat"
 };
+
+/** Callout kinds only the GM ever sees (dropped from the stored player HTML). */
+export const GM_ONLY_CALLOUTS = new Set(["dm", "whisper", "beat"]);
 
 export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "svg", "avif", "bmp"];
 
@@ -519,10 +525,11 @@ function postProcess(root, { gm, revealed, notePath }) {
       continue;
     }
 
-    if ( (kind === "dm" || kind === "whisper") && !gm ) { bq.remove(); continue; }
+    if ( GM_ONLY_CALLOUTS.has(kind) && !gm ) { bq.remove(); continue; }
 
     const aside = doc.createElement(info.fold ? "details" : "aside");
     aside.className = `codex-callout codex-callout-${kind}`;
+    if ( kind === "beat" ) aside.classList.add(`codex-beat-${parseBeatMeta(info.meta).priority}`);
     aside.dataset.callout = kind;
     if ( bq.dataset.codexLine ) aside.dataset.codexLine = bq.dataset.codexLine;
     if ( info.title ) aside.dataset.title = info.titleText;
@@ -651,6 +658,7 @@ function calloutIcon(kind) {
     readaloud: "fa-solid fa-book-open-reader",
     dm: "fa-solid fa-lock",
     whisper: "fa-solid fa-user-secret",
+    beat: "fa-solid fa-scroll",
     secret: "fa-solid fa-eye-slash",
     note: "fa-solid fa-pen",
     info: "fa-solid fa-circle-info",
@@ -674,7 +682,8 @@ function defaultCalloutTitle(kind) {
   return {
     readaloud: "Read-aloud",
     dm: "DM only",
-    whisper: "Private line"
+    whisper: "Private line",
+    beat: "Beat"
   }[kind] ?? (kind.charAt(0).toUpperCase() + kind.slice(1));
 }
 
