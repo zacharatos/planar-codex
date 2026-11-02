@@ -14,6 +14,7 @@ import { shareWith, decorateCallouts, whispersApi } from "./actions.mjs";
 import { attachAutocomplete } from "./autocomplete.mjs";
 import { onViewRendered, interceptEdit, editInPlace, contentContainer } from "./inline-edit.mjs";
 import { decorateBeats } from "./prompter/beats-in-note.mjs";
+import { wireCitations } from "./library/index.mjs";
 
 const Base = foundry.applications.sheets.journal.JournalEntryPageMarkdownSheet;
 
@@ -87,6 +88,7 @@ export class CodexMarkdownSheet extends Base {
     if ( game.user.isGM ) {
       decorateCallouts(root, { source: this.document.uuid });
       decorateBeats(this.document, root);
+      wireCitations(root);
       this.#insertToolbar(root);
     }
     this.#activateTasks(root);

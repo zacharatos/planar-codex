@@ -84,6 +84,49 @@ The **Prompter** is a GM-only panel beside the canvas that keeps tonight's impor
 
 The Prompter tells Planar Atlas and Planar Whispers which session it is when you start, so their logs carry the number. None of the other modules is required.
 
+## Lens: everything your notes know about what's in front of you
+
+The GM console (the Prompter's window) has a second tab, the **Lens** (Φακός). Open it from the tab, or with **Alt+L**.
+
+- **It follows the table:** a Planar Theater place or NPC card shown, a Planar Atlas stop, the scene that becomes active, an NPC token you select. Or type any name, in any language your notes use. **📌** pins it.
+- **It shows**, most useful first:
+  - **People:** an NPC's *want / fear / tell*, voice, attitude, what they know and their status, plus their faction standing (Planar Factions).
+  - **The place:** its Atlas card and *Move the party*, its Theater images with *Show* and *Back to the map*, and the shops there (Planar Store).
+  - **Debts and favours** that involve it.
+  - **Tonight:** the deck's beats about it, and tonight's notes.
+  - **Open threads** from your ledger.
+  - **Where your prep and past sessions mention it**, best match first, one click to the spot.
+  - **Its book references.**
+- **What it reads:** notes you already keep, by their frontmatter. Each is optional; the Lens shows what it finds.
+  - `type: npcs`: people as headings followed by `- **Label:** value` bullets, and tables whose first column is *NPC* or *Name*:
+
+    ```markdown
+    ### Brannoc (ο Μπράνοκ; smith, Low Ward) — first met Session 02
+    - **Want / Fear / Tell:** a good blade / the guild / taps the anvil twice
+    - **Voice at our table:** gruff
+    - **Knows:** where the library keeps its back door
+    ```
+
+    A name in the other script, first in the brackets, is another name for the same person.
+  - `type: ledger`: tables whose first column is `#` (one numbered thread per row; columns named *Owner*, *Made in*, *Best payoff point* and *Status* are recognised).
+  - `type: prep` and `type: session` notes: searched for mentions (run sheets without their beat boxes; the deck lists those).
+  - Notes tagged `glossary`: two-column tables pairing names (*English | Ελληνικά*). Every row makes both names find the same things.
+  - Note names and `aliases` work the same way.
+- A first name finds the whole name ("Marina" finds "Marina Kollia") when nothing else is called just that.
+
+## Library: the books, one click from any citation
+
+Import the books you own once, and every book citation in your notes (`` `ToFW, Ch. 2 › Harmonium Officers` ``) opens that section, GM only.
+
+1. Journal sidebar → **Library** → the import button (or *Import books* in the Library). Choose the folder that holds your books: **one subfolder per book, one Markdown file per chapter** (files and folders starting with `_` are skipped).
+   - A note at the top of that folder with a table of **code** and **book** columns gives each book the code your notes cite it by. Otherwise the code is the book's initials, and you can change it before importing.
+   - Books with many chapters start unticked: rules books are usually already in the dnd5e compendiums.
+2. The books go into a world compendium, **Library (Planar Codex)**, that only GMs and Assistant GMs can open. Nothing is shipped with the module and nothing leaves your world. Importing a book again replaces it.
+3. **Read:**
+   - Click a citation in a note, in a Prompter card or in the Lens: the Library opens on that section, with where it sits in the chapter, ◀ ▶ to step through the sections, *Contents*, and *Whole chapter*.
+   - A citation with no book (`` `› M3` ``) looks in the book of the citation before it first, then in the other books the note cites.
+   - **Alt+B** opens the Library; its search box looks through headings first, then the text.
+
 ## Syntax
 
 | You want | Write |
@@ -142,8 +185,11 @@ The page's stored HTML is the player version: `[!dm]`, `[!whisper]` and `[!beat]
 | Prompter: chime | per computer | A soft sound with those notifications |
 | Prompter: sending its private lines plays a beat | world | When every private line on a beat card has been sent from the card, the beat is marked played |
 | Prompter: open at login | per computer | Opens the Prompter when you log in while a session is running |
+| Lens: follow the table | per computer | The Lens moves to what Theater, the Atlas or the scene shows |
+| Lens: follow selected NPC tokens | per computer | Selecting a token no player owns points the Lens at it |
+| Lens: switch to it when the table moves | per computer | Off: the Lens tab only shows a dot when it has something new |
 
-Keybindings: *Configure Controls → Planar Codex → Edit the note here* (Ctrl+E by default), *Prompter: show or hide* (Alt+D), *Prompter: quick note* (Alt+N).
+Keybindings: *Configure Controls → Planar Codex → Edit the note here* (Ctrl+E by default), *Prompter: show or hide* (Alt+D), *Prompter: quick note* (Alt+N), *Lens: show* (Alt+L), *Library: open* (Alt+B).
 
 ## Contributing and development
 

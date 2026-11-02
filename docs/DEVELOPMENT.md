@@ -31,11 +31,22 @@ scripts/
     panel.mjs            the GM panel (ApplicationV2), Start / Close, writing the live log, jump to a beat in the sheet
     beats-in-note.mjs    state and buttons on beat callouts in the reading view
     index.mjs            settings, keybindings, toolbar button, the `api.prompter` object
+  lens/
+    core.mjs             pure: sections, tables, people / ledger / glossary parsing, name variants and the NameBook, mentions (unit-tested)
+    data.mjs             gathers what notes (by frontmatter type) and the other Planar modules know about a name; parses once per Markdown version
+    index.mjs            the Lens target, following the table (Prompter contexts, selected NPC tokens), settings
+    view.mjs             the Lens tab's HTML and clicks (rendered inside the Prompter panel, prompter/panel.mjs)
+  library/
+    core.mjs             pure: book index, citations, finding a section, section Markdown, search, batching (unit-tested)
+    store.mjs            the GM-only world compendium: reading a books folder, importing, loading books (cached)
+    index.mjs            openLibrary, resolveCitation, wireCitations (citation chips → Library), the keybinding, `api.library`
+    window.mjs           the reader window (books, contents, a section, search)
+    importer.mjs         the Import books window
 styles/codex.css         reading view, editor and window styles
 lang/en.json             interface strings (keys under PLANARCODEX.*)
 lib/                     vendored browser builds: codemirror.esm.js, marked.esm.js (+ licences)
 lib-src/codemirror.mjs   the CodeMirror entry point lib/codemirror.esm.js is built from
-test/                    node:test unit tests, helpers, and the browser harnesses (test/harness/: note view, prompter.html)
+test/                    node:test unit tests, helpers, and the browser harnesses (test/harness/: note view, prompter.html, lens.html with made-up notes in lens/)
 tools/                   package, stamp-manifest, release-api, build-lib, serve, vault-check, heading-check
 .github/workflows/       ci.yml, release.yml
 ```
@@ -153,3 +164,19 @@ Editing
 ## Versions
 
 Follow [SemVer](https://semver.org/). Update `CHANGELOG.md` first, set the same version in `module.json` and `package.json`, then tag. Compatibility lives in `module.json` (`minimum`, `verified`, `maximum`); raise `verified` only after testing on that Foundry build.
+
+Lens (harness first: `npm run harness`, then /test/harness/lens.html?q=Marina, or ?q=The%20Old%20Library; `window.prompter.hear({kind: "place", text: "Ch03 - 02 - The Old Library"})` moves it)
+- Alt+L opens the console on the Lens with the cursor in its box; typing a name and Enter shows it; a first name finds the full name; a Greek name finds what its English pair finds (glossary note).
+- An NPC from a `type: npcs` note shows want / fear / tell, the other fields, *Open the note* (opens at the heading), and *NPC card* when a Theater card has that name.
+- Show a Theater place (stage and over the map), move the Atlas party, select an NPC token: the Lens follows (a dot on its tab while the Prompter tab is open; or it switches, with the setting). 📌 stops that; unpin and it follows again.
+- Place card: *Atlas card*, *Move the party*, *Show* and *Back to the map* work; a shop's button opens the Planar Store console on it. A Factions contact shows its faction and attitude; open debts and favours appear.
+- Beats: clicking one opens the Prompter tab with it expanded. Threads, prep and session hits open the note at that line.
+- Typing in the Lens box survives the console redrawing (a Theater fade, a note added).
+- Without Theater, Atlas, Factions or Store active: their parts are simply missing, nothing errors.
+
+Library
+- Journal sidebar → Library → Import books: choose the books folder; the codes come from the index note's table; big books start unticked; import. A compendium "Library (Planar Codex)" appears, GM only (a player can't see or open it). Importing a book again replaces it.
+- Click citations in a note (`ToFW, Ch. 2 › Harmonium Officers`, `› M3` after it, `AATM › …`): the Library opens on that section; ◀ ▶, Contents and Whole chapter work; the ↗ button opens the chapter as a journal page.
+- A citation of a book not in the Library searches instead and says so. Alt+B opens it; search finds headings first; the scope menu limits it to one book.
+- As a player, citations are plain text and nothing opens.
+

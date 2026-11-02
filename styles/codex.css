@@ -538,3 +538,105 @@ img.codex-image { max-width: 100%; height: auto; border: none; border-radius: 4p
 .codex-prompter .pr-empty { padding: 20px; text-align: center; color: var(--pr-muted); }
 .codex-prompter-close .pr-warn { color: #f08d86; font-weight: 700; }
 .codex-prompter-close textarea { width: 100%; min-height: 3em; }
+
+/* =====================================================================
+   GM console tabs, Lens (Φακός) and Library (Βιβλιοθήκη)
+   ===================================================================== */
+
+.codex-prompter .cx-tabs { display: flex; gap: 4px; padding: 6px 10px 0; border-bottom: 1px solid var(--pr-rule); }
+.codex-prompter .cx-tab {
+  flex: 0 0 auto; width: auto; padding: 4px 10px; border: 1px solid transparent; border-bottom: none;
+  border-radius: 6px 6px 0 0; background: transparent; color: var(--pr-muted); font-weight: 700; font-size: 13px;
+}
+.codex-prompter .cx-tab.active { background: var(--pr-card); border-color: var(--pr-rule); color: var(--pr-text); }
+.codex-prompter .cx-tab.cx-library { margin-left: auto; width: 34px; padding: 4px 0; }
+.codex-prompter .cx-dot { color: var(--pr-hot); font-size: 10px; vertical-align: top; }
+
+/* Citations open the Library (GM views) */
+.codex-cites-live cite.codex-cite { cursor: pointer; text-decoration: underline dotted rgba(169, 162, 148, 0.6); text-underline-offset: 2px; }
+.codex-cites-live cite.codex-cite:hover { color: var(--codex-text, #e9e4da); text-decoration-style: solid; }
+
+/* ----- Lens ----- */
+.codex-prompter .lens { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px; }
+.codex-prompter .lens-search { display: flex; align-items: center; gap: 6px; }
+.codex-prompter .lens-search > i { color: var(--pr-muted); }
+.codex-prompter .lens-search input { flex: 1; height: 28px; }
+.codex-prompter .lens-pin { flex: 0 0 auto; width: 30px; height: 28px; padding: 0; }
+.codex-prompter .lens-pin.on { background: rgba(242, 193, 78, 0.25); border-color: var(--pr-hot); color: var(--pr-hot); }
+.codex-prompter .lens-help, .codex-prompter .lens-none { margin: 4px 0; font-size: 13px; color: var(--pr-muted); line-height: 1.45; }
+.codex-prompter .lens-target { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.codex-prompter .lens-name { font-size: 12.5px; padding: 1px 8px; border-radius: 10px; background: var(--pr-card); border: 1px solid var(--pr-rule); }
+.codex-prompter .lens-name.lens-main { font-weight: 700; font-size: 14px; border-color: var(--pr-should); }
+.codex-prompter .lens-from { margin-left: auto; font-size: 11.5px; color: var(--pr-muted); }
+.codex-prompter .lens-history { font-size: 12px; color: var(--pr-muted); padding-top: 4px; border-top: 1px solid var(--pr-rule); }
+.codex-prompter .lens-history a { cursor: pointer; }
+
+.codex-prompter .lens-card { background: var(--pr-card); border: 1px solid var(--pr-rule); border-radius: 6px; padding: 4px 8px 6px; }
+.codex-prompter .lens-card h3 {
+  margin: 2px 0 4px; padding: 0; border: none; font-family: var(--codex-font); font-size: 12px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--pr-muted);
+}
+.codex-prompter .lens-people { border-left: 4px solid #5b9bd8; }
+.codex-prompter .lens-threads { border-left: 4px solid var(--pr-should); }
+.codex-prompter .lens-beats { border-left: 4px solid var(--pr-must); }
+.codex-prompter .lens-person + .lens-person { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--pr-rule); }
+.codex-prompter .lens-person header b { font-size: 15px; }
+.codex-prompter .lens-alias { color: var(--pr-muted); font-size: 12.5px; }
+.codex-prompter .lens-about { font-size: 12px; color: var(--pr-muted); }
+.codex-prompter .lens-wft { margin: 4px 0; padding: 4px 6px; border-radius: 4px; background: rgba(91, 155, 216, 0.12); font-size: 13px; line-height: 1.4; }
+.codex-prompter .lens-wft b { display: inline-block; min-width: 5.5em; color: #9cc6ee; font-weight: 700; }
+.codex-prompter .lens-field { font-size: 12.5px; line-height: 1.4; margin: 2px 0; }
+.codex-prompter .lens-label { color: var(--pr-muted); font-weight: 700; margin-right: 3px; }
+.codex-prompter .lens-field.lens-book { font-size: 11.5px; color: var(--pr-muted); }
+.codex-prompter .lens-contact { font-size: 12.5px; margin: 2px 0; }
+.codex-prompter .lens-att { padding: 0 6px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); }
+.codex-prompter .lens-att-hostile { background: rgba(208, 84, 77, 0.3); color: #ffd2cf; }
+.codex-prompter .lens-att-friendly { background: rgba(79, 138, 92, 0.35); color: #d5f0da; }
+.codex-prompter .lens-status { font-size: 11.5px; color: var(--pr-muted); }
+.codex-prompter .lens-row { display: block; position: relative; padding: 3px 0; font-size: 13px; line-height: 1.35; color: var(--pr-text); }
+.codex-prompter a.lens-row { cursor: pointer; border-radius: 4px; }
+.codex-prompter a.lens-row:hover { background: rgba(255, 255, 255, 0.05); }
+.codex-prompter .lens-row > .lens-acts { float: right; }
+.codex-prompter .lens-sub { font-size: 12px; color: var(--pr-muted); margin-top: 1px; }
+.codex-prompter .lens-gm { font-style: italic; }
+.codex-prompter .lens-acts { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.codex-prompter .lens-row > .lens-acts { margin-top: 0; }
+.codex-prompter .lens-btn { flex: 0 0 auto; width: auto; padding: 2px 8px; font-size: 12px; line-height: 1.4; }
+.codex-prompter .lens-btn.busy { opacity: 0.5; pointer-events: none; }
+.codex-prompter .lens-beat.lens-played, .codex-prompter .lens-beat.lens-skipped { opacity: 0.55; }
+.codex-prompter .lens-st { float: right; color: var(--pr-muted); }
+.codex-prompter .lens-books cite { margin-right: 6px; }
+.codex-prompter .lens-books .lens-btn { margin-top: 4px; }
+
+/* ----- Library ----- */
+.codex-library .window-content { padding: 0; font-family: var(--codex-font); }
+.codex-library .lib { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 12px; }
+.codex-library .lib-search { display: flex; gap: 6px; align-items: center; position: sticky; top: 0; z-index: 1; padding: 4px 0; background: var(--color-cool-5, #1b1a18); }
+.codex-library .lib-search input[name=q] { flex: 1; height: 28px; }
+.codex-library .lib-search select { flex: 0 0 auto; max-width: 40%; height: 28px; }
+.codex-library .lib-icon { flex: 0 0 auto; width: 32px; height: 28px; padding: 0; }
+.codex-library .lib-message { margin: 0; font-size: 13px; color: #f0d9a6; }
+.codex-library .lib-empty, .codex-library .lib-none { color: #a9a294; font-size: 13.5px; }
+.codex-library .lib-books { list-style: none; margin: 0; padding: 0; }
+.codex-library .lib-books li a { display: block; padding: 6px 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); cursor: pointer; }
+.codex-library .lib-books b, .codex-library .lib-where b { color: #e3bf74; }
+.codex-library .lib-title { margin: 4px 0 6px; border: none; }
+.codex-library .lib-chapter summary { padding: 4px 0; cursor: pointer; font-weight: 700; }
+.codex-library .lib-chapter ul { list-style: none; margin: 0 0 6px; padding: 0 0 0 12px; font-size: 13px; }
+.codex-library .lib-chapter .lib-l3 { padding-left: 14px; color: #c9c3b6; }
+.codex-library .lib-chapter a, .codex-library .lib-results a { cursor: pointer; }
+.codex-library .lib-results { list-style: none; margin: 0; padding: 0; }
+.codex-library .lib-results li a { display: block; padding: 6px 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.codex-library .lib-results li a:hover { background: rgba(255, 255, 255, 0.05); }
+.codex-library .lib-where { font-size: 12px; color: #a9a294; }
+.codex-library .lib-head { display: block; font-weight: 700; }
+.codex-library .lib-excerpt { display: block; font-size: 12.5px; color: #c9c3b6; }
+.codex-library .lib-crumbs { font-size: 12.5px; color: #a9a294; }
+.codex-library .lib-nav { display: flex; gap: 6px; align-items: center; }
+.codex-library .lib-nav button { flex: 0 0 auto; width: auto; padding: 3px 10px; }
+.codex-library .lib-nav button.on { background: rgba(227, 191, 116, 0.25); border-color: #e3bf74; }
+.codex-library .lib-nav button:last-child { margin-left: auto; }
+.codex-library .lib-text { font-family: var(--codex-font-read); font-size: var(--codex-font-size, 15px); line-height: 1.55; }
+.codex-library-import .lib-import-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.codex-library-import .lib-import-row input[type=text] { flex: 0 0 5.5em; }
+.codex-library-import .lib-import-name { flex: 1; }

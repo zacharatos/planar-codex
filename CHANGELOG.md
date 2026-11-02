@@ -3,6 +3,26 @@
 All notable changes to this module. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 The release workflow uses the section matching the tag as the GitHub release notes, so keep the `## [x.y.z]` headings exact.
 
+## [0.6.0]
+
+### Added
+- **The GM console.** The Prompter's window has tabs: *Prompter* and *Lens*, and a book button for the Library.
+- **Lens** (Φακός), the console's second tab (Alt+L): everything the notes know about one name, most useful first.
+  - Shows people (*want / fear / tell*, voice, attitude, what they know, status) and the place: Planar Atlas card and *Move the party*, Planar Theater images with *Show* and *Back to the map*, NPC cards, Planar Store shops.
+  - Also: Planar Factions contacts, debts and favours; the deck's beats and tonight's notes; open ledger threads; where the prep and the session notes mention it (best match first, one click to the line); its book citations.
+  - **Follows the table:** a Theater place or NPC card shown (on the stage or over the map), an Atlas stop, the active scene, a selected NPC token. 📌 pins it; a history of recent names.
+  - Reads notes by frontmatter: `type: npcs` (heading blocks with `- **Label:**` fields, tables whose first column is NPC or Name), `type: ledger` (numbered tables), `type: prep` and `type: session` (mentions; run sheets without their beat boxes), and notes tagged `glossary` (name pairs, so «η Παλιά Βιβλιοθήκη» finds what «The Old Library» finds). Note aliases count. A first name finds the full name.
+  - Settings: *Lens: follow the table*, *Lens: follow selected NPC tokens*, *Lens: switch to it when the table moves*.
+- **Library** (Βιβλιοθήκη, Alt+B, and a *Library* button in the Journal sidebar).
+  - *Import books* reads a folder of Markdown books (one subfolder per book, one file per chapter; book codes from an index table with *code* and *book* columns, or the book's initials) into a GM-only world compendium.
+  - Book citations in notes, Prompter cards and the Lens open the section they name: `ToFW, Ch. 2 › Harmonium Officers`, `PHB 2024, Ch. 7 › Using a Potion`, `› M3` (the book of the citation before it, then the other books the note cites).
+  - The reader steps ◀ ▶ through the sections and shows the contents or the whole chapter. Search looks through headings first, then the text.
+- API: `api.lens` (`open`, `show`, `gather`), `api.library` (`open`, `importBooks`, `resolve`, `books`, `pack`).
+- `test/harness/lens.html`: the Lens and the Library with stubbed Foundry and made-up notes.
+
+### Changed
+- The Prompter panel's window title follows its tab. Alt+N always opens the Prompter tab.
+
 ## [0.5.0]
 
 ### Added

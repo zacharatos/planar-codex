@@ -36,6 +36,13 @@ export function initPrompter() {
     restricted: true,
     onDown: () => { PrompterPanel.toggle(); return true; }
   });
+  game.keybindings.register(MODULE_ID, "lens", {
+    name: "PLANARCODEX.Keybindings.Lens",
+    hint: "PLANARCODEX.Keybindings.LensHint",
+    editable: [{ key: "KeyL", modifiers: ["Alt"] }],
+    restricted: true,
+    onDown: () => { PrompterPanel.lens(); return true; }
+  });
   game.keybindings.register(MODULE_ID, "prompterNote", {
     name: "PLANARCODEX.Keybindings.PrompterNote",
     hint: "PLANARCODEX.Keybindings.PrompterNoteHint",

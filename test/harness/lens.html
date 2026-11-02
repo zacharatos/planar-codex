@@ -1,0 +1,123 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!-- Lens and Library harness: the GM console's Lens tab and the Library window with stubbed Foundry globals and made-up notes.
+     `npm run harness`, then /test/harness/lens.html (?q=Marina to start on a name, ?cite=SRD, Ch. 1 › G1 to open the Library). -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel="stylesheet" href="../../styles/codex.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #0e0d0c; color: #ddd; font-family: Roboto, sans-serif; }
+  .application { position: absolute; display: flex; flex-direction: column; background: #1b1916; border: 1px solid #444; border-radius: 6px; overflow: hidden; }
+  .application .window-header { padding: 6px 10px; font: 600 13px sans-serif; color: #ccc; border-bottom: 1px solid #333; }
+  .application .window-content { flex: 1; overflow-y: auto; }
+  button { background: #2a2722; color: #ddd; border: 1px solid #555; border-radius: 4px; cursor: pointer; }
+  input { background: #111; color: #eee; border: 1px solid #555; border-radius: 4px; padding: 0 6px; }
+  #toasts { position: fixed; top: 6px; left: 6px; font: 12px sans-serif; color: #f2c14e; }
+</style></head>
+<body><div id="toasts"></div>
+<script type="module">
+  const lang = await (await fetch("../../lang/en.json")).json();
+  const get = (o, k) => k.split(".").reduce((a, b) => a?.[b], o);
+  const settings = new Map([["planar-codex.rootFolder", ""], ["planar-codex.prompterToasts", true], ["planar-codex.prompterChime", false],
+    ["planar-codex.prompterWhisperPlays", true], ["planar-codex.prompterAutoOpen", true], ["planar-codex.prompter", {}],
+    ["planar-codex.lensFollow", true], ["planar-codex.lensTokens", true], ["planar-codex.lensSwitch", false], ["planar-codex.citationPrefixes", "SRD, PHB"]]);
+  const hooks = {};
+  window.Hooks = { on: (n, f) => (hooks[n] ??= []).push(f), once: (n, f) => (hooks[n] ??= []).push(f), callAll: (n, ...a) => (hooks[n] ?? []).forEach(f => f(...a)) };
+  window.ui = { notifications: { info: m => { document.getElementById("toasts").textContent = m; console.log("INFO", m); }, warn: m => console.log("WARN", m) } };
+  window.CONST = { DOCUMENT_OWNERSHIP_LEVELS: { NONE: 0, OBSERVER: 2, OWNER: 3 } };
+  window.CONFIG = { TextEditor: { enrichers: [] } };
+  const clone = v => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
+  class ApplicationV2 {
+    constructor(options = {}) { this.options = { ...this.constructor.DEFAULT_OPTIONS, ...options }; this.rendered = false; }
+    async render({ position } = {}) {
+      if ( !this.element ) {
+        this.element = document.createElement("div");
+        this.element.className = `application ${(this.options.classes ?? []).join(" ")}`;
+        const p = position ?? this.options.position;
+        Object.assign(this.element.style, { left: `${p.left ?? 820}px`, top: `${p.top ?? 20}px`, width: `${p.width}px`, height: `${p.height}px` });
+        this.element.innerHTML = `<header class="window-header">${this.title}</header><section class="window-content"></section>`;
+        document.body.append(this.element);
+        this._onFirstRender?.({}, {});
+      }
+      const html = await this._renderHTML();
+      this._replaceHTML(html, this.element.querySelector(".window-content"));
+      this.rendered = true;
+      await this._onRender?.({}, {});
+      return this;
+    }
+    close() { this.element?.remove(); this.element = null; this.rendered = false; this._onClose?.({}); }
+  }
+  const DialogV2 = { prompt: async () => window.dialogAnswer ?? null };
+  window.foundry = {
+    applications: { api: { ApplicationV2, DialogV2 }, ux: { TextEditor: { implementation: { enrichHTML: async h => h.replace(/\[\[\/check ([^\]]+)\]\]/g, '<a class="roll-link"><i class="fa-solid fa-dice-d20"></i> $1</a>') } } } },
+    utils: { deepClone: clone, randomID: () => Math.random().toString(36).slice(2, 10), getProperty: (o, k) => k.split(".").reduce((a, b) => a?.[b], o), hasProperty: (o, k) => k.split(".").reduce((a, b) => a?.[b], o) !== undefined },
+    audio: { AudioHelper: { play() {} } }
+  };
+  const params = new URLSearchParams(location.search);
+  const mkPage = (id, name, md, meta) => {
+    const p = { id, name, uuid: `JournalEntry.${id}.JournalEntryPage.${id}`, documentName: "JournalEntryPage", type: "text",
+      text: { markdown: md, content: "" }, flags: { "planar-codex": { path: `${name}.md`, meta } },
+      getFlag(s, k) { return s === "core" ? (k === "sheetClass" ? "planar-codex.CodexMarkdownSheet" : null) : this.flags[s]?.[k]; } };
+    p.parent = { name, pages: [p], sheet: { render() { console.log("OPEN", name); } } };
+    return p;
+  };
+  const read = async f => (await fetch(`lens/${f}`)).text();
+  const pages = [
+    mkPage("sheet", "Session 07 - run sheet", await (await fetch("run-sheet.md")).text(), { type: "prep", tags: ["prep"] }),
+    mkPage("npcs", "npcs", await read("people.md"), { type: "npcs", aliases: ["NPCs"] }),
+    mkPage("ledger", "payoff-ledger", await read("ledger.md"), { type: "ledger" }),
+    mkPage("names", "names", await read("glossary.md"), { type: "reference", tags: ["glossary"] }),
+    mkPage("ch3", "Chapter 03 - The Deed", await read("chapter.md"), { type: "prep" }),
+    mkPage("s06", "2026-10-01 - Session 06 - The archivist", await read("session.md"), { type: "session" }),
+    mkPage("lib", "The Old Library", "# The Old Library\n\nA note about the place.", { type: "place", aliases: ["η Παλιά Βιβλιοθήκη"] })
+  ];
+  const byUuid = new Map(pages.map(p => [p.uuid, p]));
+  const users = [{ id: "gm", name: "GM", isGM: true, active: true }, { id: "u1", name: "Anna", isGM: false, active: true }, { id: "u2", name: "Bob", isGM: false, active: true }];
+  users.activeGM = users[0];
+  const actors = ["Ilsa Varn", "Brannoc"].map((name, i) => ({ name, type: "character", hasPlayerOwner: i === 0, id: name, testUserPermission: u => u.id === `u${i + 1}` }));
+  // The other Planar modules, as their APIs answer.
+  const apis = {
+    "planar-atlas": { clockLabel: () => "Day 3 · 21:40 · night", road: () => ({ journeys: [], active: null }), purseLog: () => [], clock: () => ({ band: "night" }),
+      findPlace: q => (/library|βιβλιοθ/i.test(q) ? { id: "old-library", name: "Η Παλιά Βιβλιοθήκη", status: "visited", uuid: "x" } : null),
+      showCard: q => console.log("ATLAS CARD", q), move: async q => console.log("ATLAS MOVE", q) },
+    "planar-theater": { overlay: () => ({}), places: () => [{ id: "t1", scene: "s1", sceneName: "Ch03", label: "Ch03 - 02 - The Old Library", title: "Η Παλιά Βιβλιοθήκη" }],
+      cast: () => [{ id: "c1", scene: "s1", label: "Marina Kollia" }], showPlace: async (l, o) => console.log("SHOW", l, o), showNpc: async (l, o) => console.log("CARD", l, o), hide: async () => console.log("HIDE") },
+    "planar-factions": { view: () => ({ contacts: [{ name: "Marina Kollia", factionName: "The Clerks", attitude: "indifferent", role: "archivist", offers: "copies of any deed, 5 gp", notes: "Sells to both sides." }],
+      ledger: [{ kind: "debt", status: "open", withName: "Brannoc the Smith", whoName: "Party", what: "A blade for the guild" }] }) },
+    "planar-store": { shops: () => [{ id: "anvil", name: "Το Αμόνι", nameEn: "The Anvil", owner: { name: "Brannoc the Smith" }, atlasPlace: "Low Ward" }], console: o => console.log("STORE", o) },
+    "planar-whispers": { parseMeta: () => ({}), fromCallouts: async () => ({ ok: true }), log: () => ({ sent: [] }) }
+  };
+  // The Library compendium, with one made-up book.
+  const bookMd = await read("book.md");
+  const bookPage = { id: "bp1", name: "Part 1 - Tales of the Town", sort: 100, text: { markdown: bookMd } };
+  const bookEntry = { id: "b1", name: "System Reference", pages: { contents: [bookPage] }, sheet: { render() { console.log("OPEN BOOK"); } } };
+  const pack = { collection: "world.planar-codex-library", metadata: { name: "planar-codex-library", packageType: "world" },
+    getIndex: async () => [{ _id: "b1", name: "System Reference", flags: { "planar-codex": { library: { code: "SRD", chapters: 1 } } } }],
+    getDocument: async () => bookEntry };
+  window.game = {
+    user: users[0], users, actors, journal: pages.map(p => p.parent), folders: [],
+    settings: { register(m, k, d) { if ( !settings.has(`${m}.${k}`) ) settings.set(`${m}.${k}`, d.default); }, get: (m, k) => clone(settings.get(`${m}.${k}`)), set: async (m, k, v) => { settings.set(`${m}.${k}`, clone(v)); }, settings },
+    keybindings: { register() {} },
+    packs: { get: id => (id === pack.collection ? pack : undefined), find: f => ([pack].find(f)) },
+    modules: { get: id => (apis[id] ? { active: true, api: apis[id] } : null) },
+    i18n: { localize: k => get(lang, k) ?? k, format: (k, d) => (get(lang, k) ?? k).replace(/\{(\w+)\}/g, (_, x) => d[x]), has: k => get(lang, k) !== undefined }
+  };
+  window.fromUuidSync = uuid => byUuid.get(uuid) ?? null;
+  window.fromUuid = async uuid => byUuid.get(uuid) ?? null;
+  const markdown = await import("../../scripts/markdown.mjs");
+  markdown.setCitationPrefixes("SRD, PHB");
+  const P = await import("../../scripts/prompter/index.mjs");
+  const Lens = await import("../../scripts/lens/index.mjs");
+  const Lib = await import("../../scripts/library/index.mjs");
+  P.initPrompter(); Lens.initLens(); Lib.initLibrary();
+  P.readyPrompter(); Lens.readyLens();
+  window.prompter = P.prompterApi;
+  window.lens = Lens;
+  window.library = Lib;
+  window.hooks = hooks;
+  const { PrompterPanel } = await import("../../scripts/prompter/panel.mjs");
+  window.PrompterPanel = PrompterPanel;
+  await PrompterPanel.open({ tab: "lens" });
+  if ( params.get("q") ) Lens.setLensTarget(params.get("q"));
+  if ( params.get("cite") ) await Lib.openLibrary({ cite: params.get("cite") });
+  window.ready = true;
+</script></body></html>

@@ -9,6 +9,9 @@ const render = md => engine.parse(md);
 const lexer = md => engine.lexer(md);
 const parser = tokens => engine.parser(tokens);
 
+/** Plain Markdown → HTML (no Codex syntax): for book chapters in the Library. */
+export const renderMarkdown = md => engine.parse(String(md ?? ""));
+
 export const MODULE_ID = "planar-codex";
 export const SHEET_CLASS = `${MODULE_ID}.CodexMarkdownSheet`;
 export const FORMAT_MARKDOWN = 2;

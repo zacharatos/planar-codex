@@ -15,6 +15,10 @@ import * as markdown from "./markdown.mjs";
 import * as vault from "./vault.mjs";
 import { updatePages } from "./batch.mjs";
 import { initPrompter, readyPrompter, prompterApi } from "./prompter/index.mjs";
+import { PrompterPanel } from "./prompter/panel.mjs";
+import { initLens, readyLens, setLensTarget } from "./lens/index.mjs";
+import { gather as lensGather } from "./lens/data.mjs";
+import { initLibrary, libraryApi, openLibrary } from "./library/index.mjs";
 
 Hooks.once("init", () => {
   const register = (key, data) => game.settings.register(MODULE_ID, key, data);
@@ -64,6 +68,8 @@ Hooks.once("init", () => {
 
   registerEnrichers();
   initPrompter();
+  initLens();
+  initLibrary();
 
   game.keybindings.register(MODULE_ID, "editHere", {
     name: "PLANARCODEX.Keybindings.EditHere",
@@ -78,6 +84,13 @@ Hooks.once("init", () => {
     importVault, collectNotes, createCodexNote, ensureRootFolder,
     showToPlayers, postToChat, whisperTo, shareWith, editInPlace,
     prompter: prompterApi,
+    /** The Lens: open({query}) shows it (on a name, if given); gather(name) returns what the notes and modules know. */
+    lens: {
+      open: (query = "") => { if ( query ) setLensTarget(query); return PrompterPanel.open({ tab: "lens" }); },
+      show: query => setLensTarget(query),
+      gather: query => lensGather(query)
+    },
+    library: libraryApi,
     openImporter: () => new CodexImporter().render({ force: true }),
     openExporter: () => new CodexExporter().render({ force: true })
   };
@@ -92,6 +105,7 @@ Hooks.once("ready", async () => {
   applyFontSize(game.settings.get(MODULE_ID, "fontSize"));
   if ( game.user === game.users.activeGM ) await refreshStoredContent();
   readyPrompter();
+  readyLens();
 });
 
 function applyFontSize(px) {
@@ -165,6 +179,7 @@ Hooks.on("renderJournalDirectory", (app, html) => {
   button("fa-solid fa-file-import", localize("Directory.Import"), () => new CodexImporter().render({ force: true }));
   button("fa-solid fa-file-export", localize("Directory.Export"), () => new CodexExporter().render({ force: true }));
   button("fa-solid fa-feather", localize("Directory.NewNote"), () => promptNewNote());
+  button("fa-solid fa-book", localize("Directory.Library"), () => openLibrary());
   const header = element.querySelector(".directory-header") ?? element.querySelector("header") ?? element;
   header.append(bar);
 });

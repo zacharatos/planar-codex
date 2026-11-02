@@ -7,7 +7,8 @@
     "Directory": {
       "Import": "Import vault",
       "Export": "Export vault",
-      "NewNote": "New note"
+      "NewNote": "New note",
+      "Library": "Library"
     },
     "Settings": {
       "RootFolderName": "Codex folder",
@@ -31,7 +32,13 @@
       "PrompterWhisperPlays": "Prompter: sending its private lines plays a beat",
       "PrompterWhisperPlaysHint": "When every private line on a beat card has been sent from the card, the beat is marked played.",
       "PrompterAutoOpen": "Prompter: open at login",
-      "PrompterAutoOpenHint": "Open the Prompter when you log in while a session is running."
+      "PrompterAutoOpenHint": "Open the Prompter when you log in while a session is running.",
+      "LensFollow": "Lens: follow the table",
+      "LensFollowHint": "The Lens moves to what the table shows: a Planar Theater place or NPC card, a Planar Atlas stop, the scene. Pin it to keep it still.",
+      "LensTokens": "Lens: follow selected NPC tokens",
+      "LensTokensHint": "Selecting a token that no player owns points the Lens at it.",
+      "LensSwitch": "Lens: switch to it when the table moves",
+      "LensSwitchHint": "Off: the Lens tab only shows a dot when it has something new. On: the console switches to the Lens."
     },
     "Import": {
       "Title": "Import Obsidian vault",
@@ -138,7 +145,11 @@
       "Prompter": "Prompter: show or hide",
       "PrompterHint": "Open or close the Prompter panel (the session's deck).",
       "PrompterNote": "Prompter: quick note",
-      "PrompterNoteHint": "Open the Prompter with the cursor in the note box."
+      "PrompterNoteHint": "Open the Prompter with the cursor in the note box.",
+      "Lens": "Lens: show",
+      "LensHint": "Open the GM console on the Lens, with the cursor in its search box.",
+      "Library": "Library: open",
+      "LibraryHint": "Open the Library (the books imported into this world)."
     },
     "Editor": {
       "Done": "Done",
@@ -240,6 +251,75 @@
         "Read": "{name} read «{what}»",
         "Day": "Day {day}"
       }
+    },
+    "Lens": {
+      "Title": "Lens",
+      "Placeholder": "A name: a person, a place, a thing…",
+      "Help": "The Lens follows the table: a Theater place or NPC card, a stop on the Atlas, the scene, a selected NPC token. Or type a name. It shows what your notes know: people (want / fear / tell), the place, factions, tonight's beats, open threads, where the prep and the sessions mention it, the books.",
+      "TooShort": "Type at least three letters of a name.",
+      "Nothing": "Nothing in the notes about «{name}».",
+      "Pin": "Pin: stop following the table",
+      "Unpin": "Unpin: follow the table again",
+      "FromToken": "Token",
+      "People": "People",
+      "Want": "Wants",
+      "Fear": "Fears",
+      "Tell": "Tell",
+      "OpenNote": "Open the note",
+      "Card": "NPC card",
+      "Place": "The place",
+      "AtlasCard": "Atlas card",
+      "AtlasMove": "Move the party",
+      "Show": "Show",
+      "BackToMap": "Back to the map",
+      "Shop": "Open the shop",
+      "Factions": "Factions, debts and favours",
+      "Beats": "Tonight's beats",
+      "Tonight": "Tonight's notes",
+      "Threads": "Open threads",
+      "Prep": "In the prep",
+      "Sessions": "In past sessions",
+      "Notes": "Notes about it",
+      "Books": "In the books",
+      "SearchBooks": "Search the books for «{name}»",
+      "Attitude": {
+        "hostile": "hostile",
+        "indifferent": "indifferent",
+        "friendly": "friendly"
+      },
+      "PlaceStatus": {
+        "hidden": "hidden",
+        "rumoured": "rumoured",
+        "known": "known",
+        "visited": "visited"
+      }
+    },
+    "Library": {
+      "Title": "Library",
+      "PackLabel": "Library (Planar Codex)",
+      "Home": "All books",
+      "SearchPlaceholder": "Search the books…",
+      "AllBooks": "All books",
+      "Contents": "Contents",
+      "WholeChapter": "Whole chapter",
+      "AsJournal": "Open the chapter as a journal page",
+      "Empty": "The Library is empty. Import the books you own: a folder with one subfolder per book and one Markdown file per chapter.",
+      "NoBook": "The book «{code}» isn't in the Library. Searching instead.",
+      "NotFound": "Couldn't find {cite} exactly. Closest matches:",
+      "NoResults": "Nothing found for «{q}».",
+      "Gone": "That chapter isn't in the Library any more.",
+      "ImportTitle": "Import books",
+      "ImportIntro": "Choose the folder that holds your books: one subfolder per book, one Markdown file per chapter (files starting with _ are skipped). An index note at the top with a table of «code» and «book» gives each book its code, as your notes cite it. The books go into a compendium only GMs can see; nothing leaves this world.",
+      "Pick": "Choose the folder",
+      "NoFolder": "No folder chosen.",
+      "Found": "{n} books",
+      "Books": "Books to import (the code is how your notes cite the book)",
+      "CodeHint": "The book's code in citations, e.g. PHB",
+      "BigHint": "Books with more than {n} chapters start unticked: rules books are usually already in the dnd5e compendiums.",
+      "Run": "Import",
+      "Reading": "Reading the folder…",
+      "Done": "Library: {books} book(s), {chapters} chapter(s) imported.",
+      "Failed": "Import failed"
     }
   }
 }

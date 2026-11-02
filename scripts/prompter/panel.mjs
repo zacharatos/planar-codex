@@ -4,6 +4,9 @@
  * The session's deck beside the canvas: what must happen tonight, what the table just called for,
  * the rest of the deck, what to listen for, a spotlight per hero, a quick note box and the feed of
  * what the other modules saw. Start and Close the session here; closing writes the live log note.
+ *
+ * The same window is the GM console: a second tab, the Lens (../lens/), shows everything the notes know about
+ * what is in front of the table; the book button opens the Library (../library/).
  */
 import { MODULE_ID, localize, convert, getMarkdown, isCodexPage, updateMarkdown } from "../codex.mjs";
 import { escapeHTML } from "../markdown.mjs";
@@ -15,6 +18,9 @@ import {
   asleep, spotlight, flush
 } from "./state.mjs";
 import { hotBeats, cool, hear, recentContexts, whispersSince, moduleApi } from "./context.mjs";
+import { lens } from "../lens/index.mjs";
+import { renderLens, onLensClick, onLensSearch } from "../lens/view.mjs";
+import { openLibrary, wireCitations } from "../library/index.mjs";
 
 const { ApplicationV2, DialogV2 } = foundry.applications.api;
 const TextEditorImpl = () => foundry.applications.ux.TextEditor.implementation;
@@ -33,9 +39,13 @@ export class PrompterPanel extends ApplicationV2 {
   /** @type {PrompterPanel|null} */
   static instance = null;
 
-  static open() {
+  static open({ tab = null } = {}) {
     if ( !game.user.isGM ) return null;
     this.instance ??= new this();
+    if ( tab && tab !== this.instance.tab ) {
+      this.instance.tab = tab;
+      if ( this.instance.rendered ) this.instance.render();
+    }
     const w = Math.min(460, window.innerWidth - 40);
     const h = Math.max(420, Math.min(window.innerHeight - 90, 920));
     const left = Math.max(10, window.innerWidth - w - (document.getElementById("sidebar")?.offsetWidth ?? 300) - 24);
@@ -51,10 +61,18 @@ export class PrompterPanel extends ApplicationV2 {
 
   /** Open the panel and put the cursor in the note box. */
   static note() {
-    const app = this.open();
+    const app = this.open({ tab: "prompter" });
     setTimeout(() => app?.element?.querySelector(".pr-note input")?.focus(), 150);
   }
 
+  /** Open the Lens tab with the cursor in its search box. */
+  static lens() {
+    const app = this.open({ tab: "lens" });
+    setTimeout(() => { const i = app?.element?.querySelector(".lens-search input"); i?.focus(); i?.select(); }, 150);
+  }
+
+  /** "prompter" or "lens". */
+  tab = "prompter";
   expanded = new Set();
   #unsubscribe = null;
   #timer = null;
@@ -62,7 +80,7 @@ export class PrompterPanel extends ApplicationV2 {
   #bodies = new Map();
   #sent = new Map();
 
-  get title() { return localize("Prompter.Title"); }
+  get title() { return localize(this.tab === "lens" ? "Lens.Title" : "Prompter.Title"); }
 
   _onFirstRender(context, options) {
     super._onFirstRender?.(context, options);
@@ -88,6 +106,23 @@ export class PrompterPanel extends ApplicationV2 {
   /* -------------------------------------------- */
 
   async _renderHTML() {
+    if ( lens.unseen && this.tab !== "lens" && game.settings.get(MODULE_ID, "lensSwitch") ) this.tab = "lens";
+    if ( this.tab === "lens" ) lens.unseen = false;
+    const body = this.tab === "lens" ? await renderLens() : await this.#prompterHTML();
+    return `${this.#tabs()}${body}`;
+  }
+
+  #tabs() {
+    const tab = (id, icon, label) => `<button type="button" class="cx-tab ${this.tab === id ? "active" : ""}" data-pr="tab" data-tab="${id}">
+      <i class="${icon}"></i> ${label}${id === "lens" && lens.unseen ? ' <span class="cx-dot" aria-hidden="true">●</span>' : ""}</button>`;
+    return `<nav class="cx-tabs">
+      ${tab("prompter", "fa-solid fa-scroll", localize("Prompter.Title"))}
+      ${tab("lens", "fa-solid fa-magnifying-glass", localize("Lens.Title"))}
+      <button type="button" class="cx-tab cx-library" data-pr="library" data-tooltip="${esc(localize("Library.Title"))}"><i class="fa-solid fa-book"></i></button>
+    </nav>`;
+  }
+
+  async #prompterHTML() {
     const page = sheetPage();
     if ( !page ) {
       return `<div class="pr-empty"><p>${localize("Prompter.NoSheet")}</p>
@@ -217,6 +252,8 @@ export class PrompterPanel extends ApplicationV2 {
     const top = scroller.scrollTop;
     const input = content.querySelector(".pr-note input");
     const keep = input ? { value: input.value, focus: document.activeElement === input, sel: input.selectionStart } : null;
+    const lensInput = content.querySelector(".lens-search input");
+    const lensKeep = lensInput && document.activeElement === lensInput ? { value: lensInput.value, sel: lensInput.selectionStart } : null;
     const folds = Object.fromEntries(Array.from(content.querySelectorAll("details.pr-fold")).map(d => [d.className, d.open]));
     content.innerHTML = result;
     for ( const d of content.querySelectorAll("details.pr-fold") ) if ( folds[d.className] ) d.open = true;
@@ -225,6 +262,12 @@ export class PrompterPanel extends ApplicationV2 {
     if ( fresh && keep ) {
       fresh.value = keep.value;
       if ( keep.focus ) { fresh.focus(); fresh.setSelectionRange(keep.sel ?? keep.value.length, keep.sel ?? keep.value.length); }
+    }
+    const freshLens = content.querySelector(".lens-search input");
+    if ( freshLens && lensKeep ) {
+      freshLens.value = lensKeep.value;
+      freshLens.focus();
+      freshLens.setSelectionRange(lensKeep.sel ?? lensKeep.value.length, lensKeep.sel ?? lensKeep.value.length);
     }
   }
 
@@ -238,9 +281,16 @@ export class PrompterPanel extends ApplicationV2 {
     if ( !root.dataset.prompterWired ) {
       root.dataset.prompterWired = "1";
       root.addEventListener("click", ev => this.#onClick(ev));
-      root.addEventListener("submit", ev => { ev.preventDefault(); this.#submitNote(); });
+      root.addEventListener("submit", ev => {
+        ev.preventDefault();
+        if ( ev.target.closest(".lens-search") ) onLensSearch(ev.target.closest(".lens-search"));
+        else this.#submitNote();
+      });
+      wireCitations(root);
     }
-    await this.#fillBodies();
+    const title = root.querySelector(".window-title");
+    if ( title && title.textContent !== this.title ) title.textContent = this.title;
+    if ( this.tab === "prompter" ) await this.#fillBodies();
   }
 
   #tick() {
@@ -291,6 +341,11 @@ export class PrompterPanel extends ApplicationV2 {
 
   async #onClick(ev) {
     const content = this.element.querySelector(".window-content") ?? this.element;
+    const lensTarget = ev.target.closest("[data-lens]");
+    if ( lensTarget && content.contains(lensTarget) ) {
+      ev.preventDefault();
+      return onLensClick(lensTarget, this, jumpTo);
+    }
     const target = ev.target.closest("[data-pr]");
     if ( !target || !content.contains(target) ) return;
     // Buttons inside a beat's body (Whisper, Show …) and links handle themselves.
@@ -301,6 +356,8 @@ export class PrompterPanel extends ApplicationV2 {
     const page = sheetPage();
     ev.preventDefault();
     switch ( action ) {
+      case "tab": this.tab = target.dataset.tab; return this.render();
+      case "library": return openLibrary();
       case "toggle":
         if ( ev.target.closest(".pr-btns") ) return;
         if ( this.expanded.has(id) ) this.expanded.delete(id); else this.expanded.add(id);
