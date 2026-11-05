@@ -292,7 +292,9 @@
         "rumoured": "rumoured",
         "known": "known",
         "visited": "visited"
-      }
+      },
+      "Prepared": "not met yet",
+      "PreparedHint": "From the prep: the party hasn't met them (they aren't in the NPC notes yet)."
     },
     "Library": {
       "Title": "Library",

@@ -35,13 +35,15 @@ const tagsOf = page => (meta(page).tags ?? []).map(t => String(t).toLowerCase().
 
 /** Codex notes by kind. Rebuilt when the journal changes (cheap: flags only). */
 function notesBy() {
-  const out = { people: [], ledger: [], glossary: [], prep: [], session: [] };
+  const out = { people: [], peopleTagged: [], ledger: [], glossary: [], prep: [], session: [] };
   for ( const entry of game.journal ) {
     for ( const page of entry.pages ) {
       if ( !isCodexPage(page) ) continue;
       const type = typeOf(page);
       const tags = tagsOf(page);
       if ( ["npcs", "people", "npc-list"].includes(type) ) out.people.push(page);
+      // Other notes with people in them (a chapter prep's NPC voice notes, a homebrew NPC): tag `people`.
+      else if ( tags.includes("people") ) out.peopleTagged.push(page);
       if ( type === "ledger" ) out.ledger.push(page);
       if ( type === "glossary" || tags.includes("glossary") ) out.glossary.push(page);
       if ( type === "prep" ) out.prep.push(page);
@@ -55,18 +57,21 @@ function notesBy() {
 }
 
 const peopleOf = page => cached(page, "people", md => L.parsePeople(md, page.uuid));
+/** People in a tagged note: only entries with a want / fear / tell (a scene heading with bold bullets isn't a person). */
+const taggedPeopleOf = page => cached(page, "peopleTagged", md => L.parsePeople(md, page.uuid, { requireWft: true }));
 const ledgerOf = page => cached(page, "ledger", md => L.parseLedger(md));
 const glossaryOf = page => cached(page, "glossary", md => L.parseGlossary(md));
 
 /** The name book: glossary rows and people's names. Rebuilt when one of its notes changes. */
 let book = { key: "", value: null };
 function nameBook(notes) {
-  const pages = [...notes.glossary, ...notes.people];
+  const pages = [...notes.glossary, ...notes.people, ...notes.peopleTagged];
   const key = pages.map(p => `${p.uuid}:${getMarkdown(p).length}:${p._stats?.modifiedTime ?? ""}`).join("|");
   if ( book.key === key && book.value ) return book.value;
   const groups = [
     ...notes.glossary.flatMap(glossaryOf),
-    ...notes.people.flatMap(peopleOf).map(p => [p.name, ...p.aliases])
+    ...notes.people.flatMap(peopleOf).map(p => [p.name, ...p.aliases]),
+    ...notes.peopleTagged.flatMap(taggedPeopleOf).map(p => [p.name, ...p.aliases])
   ];
   // Notes named for a thing, with their aliases (a note "Farrow - Echo of the Wheel" with aliases [Farrow]).
   for ( const e of linkIndex.index.entries ) if ( e.aliases?.length ) groups.push([e.name, ...e.aliases]);
@@ -104,7 +109,11 @@ export function gather(query) {
   const out = { query, names, variants };
 
   // People: entries whose name or aliases are one of the names.
-  out.people = notes.people.flatMap(page => peopleOf(page).filter(p => L.personVariants(p).some(v => variants.includes(v))).map(person => ({ person, page })));
+  // The NPC notes first (as played), then the tagged notes (as prepared, newest first): one card per person.
+  const matching = (pages, parse) => pages.map(page => parse(page).filter(p => L.personVariants(p).some(v => variants.includes(v))).map(person => ({ person, page })));
+  const tagged = [...notes.peopleTagged].sort((a, b) => b.parent.name.localeCompare(a.parent.name, undefined, { numeric: true }));
+  out.people = L.mergeAcross([...matching(notes.people, peopleOf), ...matching(tagged, taggedPeopleOf)]);
+  out.people.forEach(p => { p.prepared = !notes.people.includes(p.page); });
 
   // Notes named for it (by note name or alias), other than the people notes.
   const notePages = [];

@@ -196,6 +196,8 @@ export function tablesOf(markdown) {
 
 const FIELD_KINDS = [
   ["wft", /\bwant\b|θελει/],
+  ["fear", /^fears?\b|^φοβ/],
+  ["tell", /^tell\b|^σημαδι/],
   ["voice", /\bvoice\b|φωνη/],
   ["attitude", /\battitude\b|σταση/],
   ["knows", /\bknow|ξερει/],
@@ -208,23 +210,50 @@ export function fieldKind(label) {
 }
 
 /**
+ * Want, Fear and Tell written as three fields (or three table columns) → one «want / fear / tell» field, as the Lens shows it.
+ * @param {{label, value, kind}[]} fields
+ */
+export function combineWft(fields) {
+  const want = fields.find(f => f.kind === "wft");
+  const fear = fields.find(f => f.kind === "fear");
+  const tell = fields.find(f => f.kind === "tell");
+  if ( !fear && !tell ) return fields;
+  if ( want && /\//.test(want.label) ) return fields;
+  const value = [want?.value, fear?.value, tell?.value].map(v => stripMd(v ?? "") || "—").join(" / ");
+  const merged = { label: "Want / Fear / Tell", value, kind: "wft" };
+  return [merged, ...fields.filter(f => ![want, fear, tell].includes(f))];
+}
+
+/**
  * A person heading or table cell: «Farrow, Echo of the Wheel (Φάροου, ο Αντίλαλος; homebrew; the Trollskull) — first met S00».
  * The first part in brackets gives other names when it is in the other script (Greek for an English name, or the reverse).
  */
 export function parsePersonTitle(raw) {
-  const text = stripMd(raw);
+  // A homebrew mark at the end ("… (the Taker) [HB]") is about the person, not part of the name.
+  let text = stripMd(raw);
+  const marks = [];
+  text = text.replace(/\s*\[(HB|HOMEBREW|homebrew|hb)\]\s*/g, () => { marks.push("homebrew"); return " "; }).trim();
   const [title, ...after] = text.split(/\s+[—–]\s+/);
   const m = title.match(/^(.*?)\s*\((.*)\)\s*$/);
   const name = (m ? m[1] : title).trim();
   const parts = m ? m[2].split(";").map(s => s.trim()).filter(Boolean) : [];
   const aliases = [];
   const about = [];
+  const capital = w => /^[A-ZΑ-ΩΆΈΉΊΌΎΏ0-9]/u.test(w);
   parts.forEach((p, i) => {
     const otherScript = (hasGreek(name) && !hasGreek(p) && hasLatin(p)) || (!hasGreek(name) && hasGreek(p));
-    const nameLike = p.split(",").every(x => x.trim().split(/\s+/).length <= 6);
-    if ( i === 0 && otherScript && nameLike ) aliases.push(...p.split(",").map(s => s.trim()).filter(Boolean));
+    const pieces = p.split(",").map(x => x.trim()).filter(Boolean);
+    const nameLike = pieces.every(x => x.split(/\s+/).length <= 6);
+    if ( i === 0 && otherScript && nameLike ) {
+      // "Parisa, bariaur tout": with commas, only the pieces that look like names (a capital letter) are names.
+      const named = pieces.length > 1 ? pieces.filter(x => x.split(/\s+/).some(capital)) : pieces;
+      aliases.push(...named);
+      const rest = pieces.filter(x => !named.includes(x));
+      if ( rest.length ) about.push(rest.join(", "));
+    }
     else about.push(p);
   });
+  if ( marks.length && !about.some(a => /homebrew/i.test(a)) ) about.push("homebrew");
   return { name, aliases, about: about.join("; "), note: after.join(" — ").trim() };
 }
 
@@ -235,7 +264,7 @@ const NAME_COLUMNS = /^(npc|name|who|person|ονομα|ποιοσ)$/;
  * People in a note: heading blocks with `- **Label:** value` bullets, and rows of tables whose first column is a name.
  * @returns {{name, aliases, about, note, fields: {label, value, kind}[], line, source}[]}
  */
-export function parsePeople(markdown, source = "") {
+export function parsePeople(markdown, source = "", { requireWft = false } = {}) {
   const people = [];
   for ( const sec of sectionsOf(markdown) ) {
     if ( sec.level < 2 || SKIP_HEADINGS.test(sec.text) ) continue;
@@ -248,7 +277,7 @@ export function parsePeople(markdown, source = "") {
     if ( !fields.length ) continue;
     const t = parsePersonTitle(sec.raw);
     if ( !t.name ) continue;
-    people.push({ ...t, fields, line: sec.line, source });
+    people.push({ ...t, fields: combineWft(fields), line: sec.line, source });
   }
   for ( const table of tablesOf(markdown) ) {
     if ( !NAME_COLUMNS.test(fold(table.header[0] ?? "")) ) continue;
@@ -257,10 +286,42 @@ export function parsePeople(markdown, source = "") {
       if ( !t.name ) continue;
       const fields = table.header.slice(1).map((label, i) => ({ label: stripMd(label), value: row.cells[i + 1] ?? "", kind: fieldKind(label) }))
         .filter(f => stripMd(f.value) && !/^[—–-]$/.test(stripMd(f.value)));
-      people.push({ ...t, fields, line: row.line, source, row: true });
+      people.push({ ...t, fields: combineWft(fields), line: row.line, source, row: true });
     }
   }
-  return mergePeople(people);
+  // Outside the NPC notes (prep, homebrew), only entries with a want / fear / tell are people: scene headings aren't.
+  return mergePeople(requireWft ? people.filter(p => p.fields.some(f => f.kind === "wft")) : people);
+}
+
+/**
+ * People from several notes, as one list: the first note that has a person keeps them (the NPC notes come first, so
+ * "as played" wins over "as prepared"); the same person in a later note adds its new fields and is remembered in `also`.
+ * @param {{person: object, page: any}[][]} lists  in order of authority
+ * @returns {{person: object, page: any, also: {page: any, line: number}[]}[]}
+ */
+export function mergeAcross(lists) {
+  const out = [];
+  // Full names, with and without a leading article («ο Ζοκ» is «Ζοκ»); not the part before a comma (too loose).
+  const keys = p => new Set([p.name, ...p.aliases].flatMap(n => {
+    const f = fold(stripMd(n).replace(/\([^)]*\)/g, " "));
+    const words = f.split(" ");
+    return words.length > 1 && ARTICLES.has(words[0]) ? [f, words.slice(1).join(" ")] : [f];
+  }).filter(k => k.length >= MIN_NAME));
+  for ( const list of lists ) {
+    for ( const { person, page } of list ) {
+      const mine = keys(person);
+      const same = out.find(o => [...keys(o.person)].some(k => mine.has(k)));
+      if ( !same ) { out.push({ person: { ...person, fields: [...person.fields], aliases: [...person.aliases] }, page, also: [] }); continue; }
+      if ( same.page === page && same.person.line === person.line ) continue;
+      same.also.push({ page, line: person.line });
+      for ( const a of [person.name, ...person.aliases] ) {
+        if ( fold(a) !== fold(same.person.name) && !same.person.aliases.some(x => fold(x) === fold(a)) ) same.person.aliases.push(a);
+      }
+      const have = new Set(same.person.fields.map(f => `${f.kind}|${fold(f.value)}`));
+      for ( const f of person.fields ) if ( !have.has(`${f.kind}|${fold(f.value)}`) ) same.person.fields.push({ ...f, extra: true, from: page });
+    }
+  }
+  return out;
 }
 
 /** One entry per person: a heading block and a table row about the same name become one (heading first). */

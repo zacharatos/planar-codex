@@ -174,3 +174,50 @@ test("run sheets are searched without their beat callouts", () => {
   assert.match(out, /After the beats/);
   assert.match(out, /\[!dm\] Brannoc stays/);
 });
+
+test("person titles: a homebrew mark is about, not the name; only name-like pieces become names", () => {
+  assert.deepEqual(L.parsePersonTitle("**Ο Εισπράκτορας** (the Collector) [HB]"),
+    { name: "Ο Εισπράκτορας", aliases: ["the Collector"], about: "homebrew", note: "" });
+  assert.deepEqual(L.parsePersonTitle("**Μαρίνα** (Marina, archivist)").aliases, ["Marina"]);
+  assert.equal(L.parsePersonTitle("**Μαρίνα** (Marina, archivist)").about, "archivist");
+  assert.deepEqual(L.parsePersonTitle("**Μαρίνα** (Marina; archivist, the Old Library)").aliases, ["Marina"]);
+});
+
+const PREP = `---
+type: prep
+tags: [prep, people]
+---
+## 1. The Old Library
+
+- **Read-aloud:** dust.
+- **Loot:** nothing.
+
+## NPC voice notes
+
+| NPC | Want / Fear / Tell | Voice |
+|---|---|---|
+| **Μαρίνα Κόλλια** (Marina Kollia; archivist) | order / fire / straightens papers | dry |
+| **Ο Εισπράκτορας** (the Collector) [HB] | a fee / a fair price / rubs his thumb | greedy |
+`;
+
+test("people in a tagged note: only entries with a want / fear / tell", () => {
+  const people = L.parsePeople(PREP, "prep", { requireWft: true });
+  assert.deepEqual(people.map(p => p.name), ["Μαρίνα Κόλλια", "Ο Εισπράκτορας"]);
+  assert.deepEqual(L.parsePeople(PREP, "prep").map(p => p.name)[0], "1. The Old Library", "without the rule, a scene heading looks like a person");
+});
+
+test("people across notes: the NPC note wins, the prep adds its fields and is remembered", () => {
+  const met = L.parsePeople(PEOPLE, "npcs").map(person => ({ person, page: "npcs" }));
+  const prep = L.parsePeople(PREP, "prep", { requireWft: true }).map(person => ({ person, page: "prep" }));
+  const all = L.mergeAcross([met, prep]);
+  assert.deepEqual(all.map(p => [p.person.name, p.page]), [["Brannoc the Smith", "npcs"], ["Μαρίνα Κόλλια", "npcs"], ["Ο Εισπράκτορας", "prep"]]);
+  const marina = all[1];
+  assert.deepEqual(marina.also, [{ page: "prep", line: marina.also[0].line }]);
+  assert.ok(marina.person.fields.some(f => f.extra && f.from === "prep" && /straightens papers/.test(f.value)));
+});
+
+test("want, fear and tell in three columns become one field", () => {
+  const md = "| NPC | Want | Fear | Tell |\n|---|---|---|---|\n| **Brannoc** (smith) | a blade | the guild | taps twice |\n";
+  const [p] = L.parsePeople(md, "prep", { requireWft: true });
+  assert.deepEqual(p.fields, [{ label: "Want / Fear / Tell", value: "a blade / the guild / taps twice", kind: "wft" }]);
+});

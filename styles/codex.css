@@ -640,3 +640,5 @@ img.codex-image { max-width: 100%; height: auto; border: none; border-radius: 4p
 .codex-library-import .lib-import-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
 .codex-library-import .lib-import-row input[type=text] { flex: 0 0 5.5em; }
 .codex-library-import .lib-import-name { flex: 1; }
+.codex-prompter .lens-prepared { font-size: 11px; padding: 0 6px; border-radius: 8px; background: rgba(242, 193, 78, 0.18); color: var(--pr-hot); vertical-align: 2px; }
+.codex-prompter .lens-also { opacity: 0.85; }

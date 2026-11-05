@@ -47,7 +47,7 @@ lang/en.json             interface strings (keys under PLANARCODEX.*)
 lib/                     vendored browser builds: codemirror.esm.js, marked.esm.js (+ licences)
 lib-src/codemirror.mjs   the CodeMirror entry point lib/codemirror.esm.js is built from
 test/                    node:test unit tests, helpers, and the browser harnesses (test/harness/: note view, prompter.html, lens.html with made-up notes in lens/)
-tools/                   package, stamp-manifest, release-api, build-lib, serve, vault-check, heading-check
+tools/                   package, stamp-manifest, release-api, build-lib, serve, vault-check, heading-check, ready-check
 .github/workflows/       ci.yml, release.yml
 ```
 
@@ -86,9 +86,10 @@ then open <http://localhost:8765/test/harness/>. Add `?flat=1` to the URL to tes
 ```
 npm run check:vault -- "/path/to/your/vault"
 node tools/heading-check.mjs "/path/to/your/vault"
+node tools/ready-check.mjs "/path/to/your/vault"
 ```
 
-Converts every note in both views and reports leftover tokens, dangling links and heading links that don't resolve.
+The first two convert every note in both views and report leftover tokens, dangling links and heading links that don't resolve. `ready-check` reports what keeps notes from working with the Prompter and the Lens (types, people without want / fear / tell or a name in both languages, ledger numbers, beat triggers that match nothing at the table); `--note <path>` checks one note, `--json` for scripts.
 
 ## Vendored libraries
 
@@ -172,6 +173,7 @@ Lens (harness first: `npm run harness`, then /test/harness/lens.html?q=Marina, o
 - Place card: *Atlas card*, *Move the party*, *Show* and *Back to the map* work; a shop's button opens the Planar Store console on it. A Factions contact shows its faction and attitude; open debts and favours appear.
 - Beats: clicking one opens the Prompter tab with it expanded. Threads, prep and session hits open the note at that line.
 - Typing in the Lens box survives the console redrawing (a Theater fade, a note added).
+- A person only in a note tagged `people` shows *not met yet* and opens that note; one also in the NPC note shows once, with an *also* button per other note.
 - Without Theater, Atlas, Factions or Store active: their parts are simply missing, nothing errors.
 
 Library

@@ -109,9 +109,11 @@ The GM console (the Prompter's window) has a second tab, the **Lens** (Φακό�
 
     A name in the other script, first in the brackets, is another name for the same person.
   - `type: ledger`: tables whose first column is `#` (one numbered thread per row; columns named *Owner*, *Made in*, *Best payoff point* and *Status* are recognised).
+  - Notes tagged `people` (a chapter prep's NPC voice notes): the people in them who have *want / fear / tell*, as headings or table rows, even before the party meets them. Their card says *not met yet*; once they are in a `type: npcs` note too, that note leads and the prep shows as an *also* link.
   - `type: prep` and `type: session` notes: searched for mentions (run sheets without their beat boxes; the deck lists those).
   - Notes tagged `glossary`: two-column tables pairing names (*English | Ελληνικά*). Every row makes both names find the same things.
   - Note names and `aliases` work the same way.
+- **Check your notes:** `node tools/ready-check.mjs "<vault>"` (from a clone of this repo) lists what keeps a note from working with the Prompter and the Lens: a missing `type`, people without *want / fear / tell*, beat triggers that match nothing at the table.
 - A first name finds the whole name ("Marina" finds "Marina Kollia") when nothing else is called just that.
 
 ## Library: the books, one click from any citation

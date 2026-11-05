@@ -3,6 +3,17 @@
 All notable changes to this module. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 The release workflow uses the section matching the tag as the GitHub release notes, so keep the `## [x.y.z]` headings exact.
 
+## [0.6.1]
+
+### Added
+- **Lens: people you prepared but haven't met yet.** Notes tagged `people` (a chapter prep's NPC voice notes, say) add the people who have *want / fear / tell*, as headings or table rows. Their card carries a *not met yet* badge and opens that note.
+- The same person in several notes is one card: the `type: npcs` note leads, the others add their fields and an *also* link each. A leading article doesn't split a name («ο Ζοκ» and «Ζοκ» are one person).
+- `tools/ready-check.mjs`: checks a vault's notes are ready for the Prompter and the Lens (frontmatter types, people with want / fear / tell and a name in both languages, ledger numbers, beat triggers that match a Theater image, an Atlas place's Greek name or a person, heroes in `pc=`). `node tools/ready-check.mjs "<vault>" [--note <path>] [--json]`; exit code 1 on errors.
+
+### Changed
+- Lens: *Want*, *Fear* and *Tell* as separate fields or table columns read as one *Want / Fear / Tell*.
+- Lens: a name heading's `[HB]` mark becomes "homebrew" in the about line; in the brackets, only capitalised pieces after commas are other names (the rest is about them). Separate other names from the role with `;`.
+
 ## [0.6.0]
 
 ### Added

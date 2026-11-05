@@ -66,7 +66,7 @@ const section = (cls, icon, title, inner, count = null) => (inner ? `<section cl
 function people(data) {
   if ( !data.people.length ) return "";
   const contactFor = p => data.contacts.find(c => [p.name, ...p.aliases].some(n => stripMd(n).toLowerCase() === String(c.name).toLowerCase()));
-  const items = data.people.map(({ person: p, page }) => {
+  const items = data.people.map(({ person: p, page, also = [], prepared }) => {
     const wft = p.fields.find(f => f.kind === "wft");
     const parts = wft ? stripMd(wft.value).split(/\s+\/\s+/) : [];
     const wftHTML = wft ? `<div class="lens-wft">${["Want", "Fear", "Tell"].map((k, i) => (parts[i] && parts[i] !== "—"
@@ -78,11 +78,12 @@ function people(data) {
     const contact = c ? `<div class="lens-contact"><i class="fa-solid fa-flag"></i> ${esc(c.factionName || "")} · <span class="lens-att lens-att-${esc(c.attitude)}">${esc(word("Attitude", c.attitude))}</span>${c.role ? ` · ${esc(c.role)}` : ""}</div>` : "";
     const card = data.cards.find(t => [p.name, ...p.aliases].some(n => String(t.label).toLowerCase().includes(stripMd(n).toLowerCase())));
     const buttons = [
-      `<button type="button" class="lens-btn" data-lens="open" data-uuid="${esc(page.uuid)}" data-line="${p.line}"><i class="fa-solid fa-file-lines"></i> ${localize("Lens.OpenNote")}</button>`,
+      `<button type="button" class="lens-btn" data-lens="open" data-uuid="${esc(page.uuid)}" data-line="${p.line}"><i class="fa-solid fa-file-lines"></i> ${prepared ? esc(page.parent.name) : localize("Lens.OpenNote")}</button>`,
+      ...also.map(a => `<button type="button" class="lens-btn lens-also" data-lens="open" data-uuid="${esc(a.page.uuid)}" data-line="${a.line}"><i class="fa-solid fa-scroll"></i> ${esc(a.page.parent.name)}</button>`),
       card ? `<button type="button" class="lens-btn" data-lens="card" data-label="${esc(card.label)}" data-scene="${esc(card.scene)}"><i class="fa-solid fa-user"></i> ${localize("Lens.Card")}</button>` : ""
     ].join("");
     return `<article class="lens-person">
-      <header><b>${esc(stripMd(p.name))}</b>${p.aliases.length ? ` <span class="lens-alias">${esc(p.aliases.join(", "))}</span>` : ""}
+      <header>${prepared ? `<span class="lens-prepared" data-tooltip="${esc(localize("Lens.PreparedHint"))}">${localize("Lens.Prepared")}</span> ` : ""}<b>${esc(stripMd(p.name))}</b>${p.aliases.length ? ` <span class="lens-alias">${esc(p.aliases.join(", "))}</span>` : ""}
         ${p.about ? `<div class="lens-about">${esc(p.about)}${p.note ? ` · ${esc(p.note)}` : ""}</div>` : (p.note ? `<div class="lens-about">${esc(p.note)}</div>` : "")}</header>
       ${wftHTML}${contact}${fields}<div class="lens-acts">${buttons}</div></article>`;
   }).join("");
