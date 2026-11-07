@@ -48,7 +48,7 @@ Don't write a commit message unless he asks for one. If he does, offer it as a s
 
 - Foundry loads `scripts/main.mjs` directly; the only build step is for the vendored libraries in `lib/` (built from `lib-src/` with `tools/build-lib.mjs`). Don't edit `lib/` by hand.
 - Link resolution runs on every player's browser each time a page renders: keep it cached and cheap.
-- User-facing text goes in `lang/en.json`; the tests check that every key used exists. The maintainer writes or reviews interface strings himself (Foundry's AI Content Policy requires human-authored UI text for listed packages), so list any new strings in your hand-off.
+- User-facing text goes in `lang/en.json` **and** `lang/el.json` with the same keys and placeholders; the tests check that every key used exists. The maintainer writes or reviews interface strings himself (Foundry's AI Content Policy requires human-authored UI text for listed packages), so list any new strings in your hand-off.
 - Note data lives in journal page flags `flags.planar-codex`; if you change its shape, bump the content/schema version and add a migration.
-- **A new version changes every version reference in the same change:** `module.json` (`version` and the `download` URL's `vX.Y.Z`), `package.json` and `package-lock.json` (`version`), and a `## [X.Y.Z]` section at the top of `CHANGELOG.md`. `npm test` fails if they disagree. Follow semver: a new feature bumps the minor, a fix the patch.
+- **Versions:** change them only when asked (or when the task is a release). A version change updates every reference in the same change: `module.json` (`version` and the `download` URL's `vX.Y.Z`), `package.json` and `package-lock.json` (`version`), a `## [X.Y.Z]` section at the top of `CHANGELOG.md`, and any version a README or doc names. Follow semver: a new feature bumps the minor, a fix the patch. `npm test` fails if they disagree.
 - Never add campaign content, publisher text, art or audio to the repo.
