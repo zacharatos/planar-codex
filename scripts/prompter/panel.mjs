@@ -12,12 +12,12 @@ import { MODULE_ID, localize, convert, getMarkdown, isCodexPage, updateMarkdown 
 import { escapeHTML } from "../markdown.mjs";
 import { decorateCallouts } from "../actions.mjs";
 import { createCodexNote } from "../notes.mjs";
-import { parseNote, buildLiveLog, pad2, duration, hash, isKindOfMoment, NOTE_TAGS } from "./core.mjs";
+import { parseNote, buildLiveLog, pad2, duration, hash, isKindOfMoment, NOTE_TAGS, lastActivity, closeNudge, isNight } from "./core.mjs";
 import {
   subscribe, sheetPage, setSheet, candidateSheets, readSheet, run, mutateRun, setBeat, addNote, removeNote,
-  asleep, spotlight, flush
+  asleep, absentHeroes, spotlight, setPresent, livePresence, flush
 } from "./state.mjs";
-import { hotBeats, cool, hear, recentContexts, whispersSince, moduleApi } from "./context.mjs";
+import { hotBeats, cool, hear, recentContexts, whispersSince, moduleApi, isActiveGM, gmRest } from "./context.mjs";
 import { lens } from "../lens/index.mjs";
 import { renderLens, onLensClick, onLensSearch } from "../lens/view.mjs";
 import { openLibrary, wireCitations } from "../library/index.mjs";
@@ -27,6 +27,9 @@ const TextEditorImpl = () => foundry.applications.ux.TextEditor.implementation;
 const esc = escapeHTML;
 const hhmm = iso => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
 const DONE = ["played", "skipped"];
+const UNDO_MS = 6000;
+/** Offer to close after this long with nothing happening at the table. */
+const IDLE_MINUTES = 30;
 
 export class PrompterPanel extends ApplicationV2 {
   static DEFAULT_OPTIONS = {
@@ -79,6 +82,12 @@ export class PrompterPanel extends ApplicationV2 {
   #ticker = null;
   #bodies = new Map();
   #sent = new Map();
+  /** The last ✓ / ✗ / later, for the Undo bar: {id, prev, text, until}. */
+  #undo = null;
+  #undoTimer = null;
+  /** The close offer on screen ("rest" | "idle" | null), and the activity the GM last said "not yet" to. */
+  #nudge = null;
+  #nudgeDismissed = null;
 
   get title() { return localize(this.tab === "lens" ? "Lens.Title" : "Prompter.Title"); }
 
@@ -148,8 +157,11 @@ export class PrompterPanel extends ApplicationV2 {
       <h3><i class="${icon}"></i> ${title} <span class="pr-count">${list.length}</span></h3>
       ${list.length ? list.map(b => this.#card(b, r, hot)).join("") : `<p class="pr-none">${empty}</p>`}</section>` : "");
 
+    this.#nudge = closeNudge(r, Date.now(), { idleMinutes: IDLE_MINUTES, dismissedAt: this.#nudgeDismissed });
     return `<div class="prompter">
+      ${isActiveGM() ? "" : `<div class="pr-banner pr-banner-warn" role="alert"><i class="fa-solid fa-triangle-exclamation"></i> ${localize("Prompter.NotActiveGM")}</div>`}
       ${this.#header(page, sheet, r)}
+      ${this.#nudgeBar()}
       ${this.#spotlight(page, r)}
       ${r.active ? "" : `<div class="pr-start-hint"><i class="fa-solid fa-circle-info"></i> ${localize(r.closedAt ? "Prompter.ClosedHint" : "Prompter.StartHint")}</div>`}
       ${section("pr-must", "fa-solid fa-circle-exclamation", localize("Prompter.Section.Must"), must, localize("Prompter.MustDone"))}
@@ -160,7 +172,33 @@ export class PrompterPanel extends ApplicationV2 {
       ${done.length ? `<details class="pr-fold pr-done"><summary><i class="fa-solid fa-check-double"></i> ${localize("Prompter.Section.Done")} <span class="pr-count">${done.length}</span></summary>${done.map(b => this.#card(b, r, hot)).join("")}</details>` : ""}
       ${this.#feed(r)}
       ${this.#noteBox()}
+      ${this.#undoBar()}
     </div>`;
+  }
+
+  /** "Played: X · Undo" for a few seconds after ✓, ✗ or later (a misclick used to stick). */
+  #undoBar() {
+    const u = this.#undo;
+    if ( !u || Date.now() > u.until ) return "";
+    return `<div class="pr-undo" role="status"><span>${esc(u.text)}</span>
+      <button type="button" data-pr="undo"><i class="fa-solid fa-rotate-left"></i> ${localize("Prompter.Undo")}</button></div>`;
+  }
+
+  /** The offer to close: after a Long Rest, or when the table has been quiet for a while. */
+  #nudgeBar() {
+    if ( !this.#nudge ) return "";
+    const text = this.#nudge === "rest" ? localize("Prompter.NudgeRest") : localize("Prompter.NudgeIdle", { min: IDLE_MINUTES });
+    return `<div class="pr-banner pr-banner-nudge" role="status"><i class="fa-solid fa-moon"></i> <span>${text}</span>
+      <button type="button" class="pr-close" data-pr="close-session"><i class="fa-solid fa-flag-checkered"></i> ${localize("Prompter.Close")}</button>
+      <button type="button" data-pr="nudge-later">${localize("Prompter.NotYet")}</button></div>`;
+  }
+
+  /** Remember a beat's state before a change, and show the Undo bar. */
+  #offerUndo(id, page, textKey, title) {
+    const prev = foundry.utils.deepClone(run(page).beats[id] ?? { s: null });
+    this.#undo = { id, prev, text: localize(textKey, { title }), until: Date.now() + UNDO_MS };
+    clearTimeout(this.#undoTimer);
+    this.#undoTimer = setTimeout(() => { this.#undo = null; this.renderSoon(); }, UNDO_MS + 50);
   }
 
   #header(page, sheet, r) {
@@ -182,6 +220,10 @@ export class PrompterPanel extends ApplicationV2 {
         ${world ? `<span class="pr-world" data-tooltip="${esc(localize("Prompter.WorldClock"))}"><i class="fa-solid fa-sun"></i> ${esc(world)}</span>` : ""}
         <span class="pr-session">${localize("Prompter.SessionN", { n: esc(pad2(sheet.session) || "?") })}</span>
       </div>
+      <div class="pr-head-row pr-rests">
+        <button type="button" class="pr-rest ${isNight(atlas?.clock?.()?.band ?? "") ? "pr-glow" : ""}" data-pr="rest" data-long="1" data-tooltip="${esc(localize("Prompter.RestTip", { rest: localize("Prompter.LongRest") }))}"><i class="fa-solid fa-bed"></i> ${localize("Prompter.LongRest")}</button>
+        <button type="button" class="pr-rest" data-pr="rest" data-long="" data-tooltip="${esc(localize("Prompter.RestTip", { rest: localize("Prompter.ShortRest") }))}"><i class="fa-solid fa-mug-hot"></i> ${localize("Prompter.ShortRest")}</button>
+      </div>
     </header>`;
   }
 
@@ -191,7 +233,10 @@ export class PrompterPanel extends ApplicationV2 {
     const max = Math.max(...list.filter(h => h.present).map(h => h.count), 0);
     const chips = list.map(h => {
       const cls = ["pr-hero", h.present ? "" : "pr-absent", h.present && h.count === 0 && max > 0 ? "pr-zero" : ""].filter(Boolean).join(" ");
-      return `<button type="button" class="${cls}" data-pr="hero-note" data-name="${esc(h.short)}" data-tooltip="${esc(localize(h.present ? "Prompter.SpotlightTip" : "Prompter.Absent", { name: h.name }))}">${esc(h.short)} <b>${h.count}</b></button>`;
+      const toggle = `<button type="button" class="pr-hero-toggle" data-pr="hero-toggle" data-actor="${esc(h.actorId)}" data-on="${h.present ? "" : "1"}"
+        aria-label="${esc(localize(h.present ? "Prompter.HeroIn" : "Prompter.HeroOut", { name: h.name }))}" data-tooltip="${esc(localize(h.present ? "Prompter.HeroIn" : "Prompter.HeroOut", { name: h.name }))}">
+        <i class="fa-solid ${h.present ? "fa-user-check" : "fa-user-slash"}"></i></button>`;
+      return `<span class="pr-hero-chip ${h.present ? "" : "pr-absent"}"><button type="button" class="${cls}" data-pr="hero-note" data-name="${esc(h.short)}" data-tooltip="${esc(localize(h.present ? "Prompter.SpotlightTip" : "Prompter.Absent", { name: h.name }))}">${esc(h.short)}${h.present ? ` <b>${h.count}</b>` : ` · ${localize("Prompter.AbsentShort")}`}</button>${toggle}</span>`;
     }).join("");
     return `<div class="pr-spot"><i class="fa-solid fa-lightbulb" data-tooltip="${esc(localize("Prompter.Spotlight"))}"></i> ${chips}</div>`;
   }
@@ -218,6 +263,7 @@ export class PrompterPanel extends ApplicationV2 {
         <span class="pr-btns">${buttons}</span>
       </div>
       ${h && !isDone ? `<div class="pr-heard"><i class="fa-solid fa-bolt"></i> ${esc(h.where)} · ${hhmm(h.t)} <a data-pr="cool">${localize("Prompter.NotNow")}</a></div>` : ""}
+      ${!isDone && asleep(b) ? `<div class="pr-asleep"><i class="fa-solid fa-moon"></i> ${localize("Prompter.AsleepWhy", { names: esc(absentHeroes(b).join(", ")) })}</div>` : ""}
       ${open ? `<div class="pr-sub">${pcs}${trig}</div>
         <div class="pr-body" data-body="${esc(b.id)}"><i class="fa-solid fa-spinner fa-spin"></i></div>
         <div class="pr-acts">
@@ -301,6 +347,8 @@ export class PrompterPanel extends ApplicationV2 {
     const w = this.element.querySelector(".pr-world");
     const label = moduleApi("planar-atlas")?.clockLabel?.();
     if ( w && label ) w.lastChild.textContent = ` ${label}`;
+    // The close offer appears by itself once the table has been quiet long enough.
+    if ( this.tab === "prompter" && closeNudge(r, Date.now(), { idleMinutes: IDLE_MINUTES, dismissedAt: this.#nudgeDismissed }) !== this.#nudge ) this.renderSoon();
   }
 
   async #fillBodies() {
@@ -363,11 +411,28 @@ export class PrompterPanel extends ApplicationV2 {
         if ( this.expanded.has(id) ) this.expanded.delete(id); else this.expanded.add(id);
         return this.render();
       case "played": {
-        const where = hotBeats().get(id)?.where ?? recentContexts()[0]?.text ?? "";
+        // Where it happened: only what called the card (if it was hot). The last thing heard can be anywhere.
+        const where = hotBeats().get(id)?.where ?? "";
+        this.#offerUndo(id, page, "Prompter.UndoPlayed", this.#titleOf(page, id));
         setBeat(id, "played", where, page); this.expanded.delete(id); return cool(id);
       }
-      case "skip": setBeat(id, "skipped", "", page); this.expanded.delete(id); return cool(id);
-      case "later": setBeat(id, "later", "", page); this.expanded.delete(id); return cool(id);
+      case "skip":
+        this.#offerUndo(id, page, "Prompter.UndoSkipped", this.#titleOf(page, id));
+        setBeat(id, "skipped", "", page); this.expanded.delete(id); return cool(id);
+      case "later":
+        this.#offerUndo(id, page, "Prompter.UndoLater", this.#titleOf(page, id));
+        setBeat(id, "later", "", page); this.expanded.delete(id); return cool(id);
+      case "undo": {
+        const u = this.#undo;
+        if ( !u ) return;
+        this.#undo = null;
+        clearTimeout(this.#undoTimer);
+        mutateRun(r => { r.beats[u.id] = u.prev; }, page);
+        return;
+      }
+      case "rest": return gmRest(!!target.dataset.long);
+      case "hero-toggle": return setPresent(target.dataset.actor, !!target.dataset.on, page);
+      case "nudge-later": this.#nudgeDismissed = lastActivity(run(page)); return this.render();
       case "reset": return setBeat(id, null, "", page);
       case "cool": return cool(id);
       case "jump": return jumpTo(page, readSheet(page).beats.find(b => b.id === id)?.line ?? 0);
@@ -381,6 +446,8 @@ export class PrompterPanel extends ApplicationV2 {
       case "hero-note": return this.#insert(`${target.dataset.name}: `);
     }
   }
+
+  #titleOf(page, id) { return readSheet(page)?.beats.find(b => b.id === id)?.title ?? ""; }
 
   #insert(text) {
     const input = this.element.querySelector(".pr-note input");
@@ -419,6 +486,10 @@ export function startSession(page = sheetPage()) {
   if ( !page ) return;
   const session = readSheet(page).session;
   mutateRun(r => {
+    // Who is at the table, taken now and kept for the whole run (the log is written from it, even the next day).
+    // Reopening with nobody logged in keeps the evening's snapshot.
+    const live = livePresence();
+    if ( !r.present || Object.values(live).some(Boolean) ) r.present = live;
     r.active = true;
     r.startedAt ??= new Date().toISOString();
     r.closedAt = null;
@@ -443,23 +514,32 @@ export async function closeSession(page = sheetPage()) {
   const questions = sheet.questions.map((q, i) => `<div class="form-group stacked"><label>${i + 1}. ${esc(q)}</label>
     <textarea name="q${i}" rows="2">${esc(r.answers?.[i] ?? "")}</textarea></div>`).join("");
   const warn = must.length ? `<p class="pr-warn"><i class="fa-solid fa-triangle-exclamation"></i> ${localize("Prompter.CloseMust", { titles: must.map(b => esc(b.title)).join(" · ") })}</p>` : "";
+  // Closed long after the last thing at the table (the next day): offer to close as of then.
+  const last = lastActivity(r);
+  const late = last && Date.now() - new Date(last).getTime() > 45 * 60000;
+  const asOf = late ? `<div class="form-group"><label class="checkbox"><input type="checkbox" name="asOf" checked> ${localize("Prompter.CloseAsOf", { time: hhmm(last) })}</label></div>` : "";
+  let closeAt = null;
   const answers = await DialogV2.prompt({
     window: { title: localize("Prompter.CloseTitle") },
     position: { width: 520 },
     classes: ["planar-codex", "codex-prompter-close"],
-    content: `${warn}<p>${localize("Prompter.CloseIntro", { open: open.length })}</p>${questions}`,
+    content: `${warn}<p>${localize("Prompter.CloseIntro", { open: open.length })}</p>${asOf}${questions}`,
     ok: {
       label: localize("Prompter.CloseOk"),
       icon: "fa-solid fa-flag-checkered",
-      callback: (event, button) => Object.fromEntries(sheet.questions.map((q, i) => [i, button.form.elements[`q${i}`]?.value ?? ""]))
+      callback: (event, button) => {
+        if ( late && button.form.elements.asOf?.checked ) closeAt = last;
+        return Object.fromEntries(sheet.questions.map((q, i) => [i, button.form.elements[`q${i}`]?.value ?? ""]));
+      }
     }
   }).catch(() => null);
   if ( !answers ) return;
   mutateRun(run => {
+    const at = closeAt ?? new Date().toISOString();
     run.answers = answers;
-    run.events.push({ t: new Date().toISOString(), kind: "session", label: localize("Prompter.Source.Prompter"), text: localize("Prompter.Event.Closed") });
+    run.events.push({ t: at, kind: "session", label: localize("Prompter.Source.Prompter"), text: localize("Prompter.Event.Closed") });
     run.active = false;
-    run.closedAt = new Date().toISOString();
+    run.closedAt = at;
   }, page);
   await flush();
   await writeLiveLog(page, { open: true });
@@ -474,7 +554,8 @@ export async function writeLiveLog(page = sheetPage(), { open = false } = {}) {
   const name = `Session ${nn} - live log`;
   const markdown = buildLiveLog({
     sheetName: page.parent?.name ?? page.name, session: sheet.session || "?", beats: sheet.beats, state: r,
-    questions: sheet.questions, asleep, spotlight: spotlight(page, whispersSince(r.startedAt)).map(h => ({ name: h.name, count: h.count, present: h.present }))
+    questions: sheet.questions, asleep, absent: absentHeroes,
+    spotlight: spotlight(page, whispersSince(r.startedAt)).map(h => ({ name: h.name, count: h.count, present: h.present }))
   });
   let logPage = r.logUuid ? fromUuidSync(r.logUuid, { strict: false }) : null;
   if ( !logPage || !isCodexPage(logPage) ) {

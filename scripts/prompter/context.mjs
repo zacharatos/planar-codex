@@ -7,10 +7,11 @@
  * Everything here runs only in the active GM's browser. Modules that aren't installed are simply never heard from.
  */
 import { MODULE_ID, localize } from "../codex.mjs";
-import { beatsFor } from "./core.mjs";
-import { sheetPage, readSheet, run, asleep, addEvent, refresh } from "./state.mjs";
+import { beatsFor, olderThan } from "./core.mjs";
+import { sheetPage, readSheet, run, asleep, addEvent, mutateRun, refresh } from "./state.mjs";
 
-const isActiveGM = () => !!game.user?.isGM && (game.users.activeGM?.id ?? game.user.id) === game.user.id;
+/** Only one GM browser listens and logs (the active GM). The panel says so in the others. */
+export const isActiveGM = () => !!game.user?.isGM && (game.users.activeGM?.id ?? game.user.id) === game.user.id;
 const api = id => { const m = game.modules.get(id); return m?.active ? m.api ?? null : null; };
 const snippet = (html, n = 70) => {
   const text = String(html ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -68,9 +69,16 @@ export function hear(context, { label = "", quiet = false } = {}) {
 /* -------------------------------------------- */
 
 const known = { whispers: new Map(), purse: new Set(), stops: new Set(), band: null, overlayPlace: null, overlayCast: new Set() };
+/**
+ * When this browser started listening. Anything the other modules stamped before it (Atlas stops and purse lines,
+ * private lines) is old news: never heard or logged again, even if their API wasn't ready when we primed (a reload
+ * mid-session used to replay the whole road). Events also carry a ref, so nothing is logged twice in a run.
+ */
+let primedAt = null;
 
 /** Remember what already exists, so only new things are reported. Called on ready. */
 export function primeContext() {
+  primedAt = new Date().toISOString();
   const pw = api("planar-whispers");
   for ( const w of pw?.log?.().sent ?? [] ) known.whispers.set(w.id, { readers: readers(w), logged: !!w.sentAt });
   const atlas = api("planar-atlas");
@@ -198,8 +206,20 @@ export function registerContextHooks() {
     addEvent("return", localize("Prompter.Source.Glitch"), localize("Prompter.Event.Return", { name: rec.actorName ?? "?", glitches }));
   });
 
-  // Presence changes put beats to sleep or wake them.
-  Hooks.on("userConnected", () => refresh());
+  // Presence: a player who joins during a running session puts their heroes at the table (never out: a dropped
+  // connection isn't leaving the table; the GM toggles that in the spotlight).
+  Hooks.on("userConnected", (user, connected) => {
+    if ( isActiveGM() && connected && !user?.isGM && run().active ) {
+      const mine = game.actors.filter(a => a.type === "character" && a.hasPlayerOwner && a.testUserPermission(user, "OWNER"));
+      const snap = run().present ?? {};
+      const joining = mine.filter(a => snap[a.id] === false);
+      if ( joining.length ) {
+        mutateRun(r => { r.present = { ...(r.present ?? {}) }; for ( const a of joining ) r.present[a.id] = true; });
+        for ( const a of joining ) addEvent("presence", localize("Prompter.Source.Prompter"), localize("Prompter.Event.Joined", { name: a.name }));
+      }
+    }
+    refresh();
+  });
 }
 
 const lastRest = new Map();
@@ -209,7 +229,21 @@ function onRest(actor, long) {
   if ( Date.now() - (lastRest.get(key) ?? 0) < 60000 ) return;
   lastRest.set(key, Date.now());
   hear({ kind: "rest", long }, { label: localize("Prompter.Source.Rest") });
-  addEvent("rest", localize("Prompter.Source.Rest"), localize(long ? "Prompter.Event.LongRest" : "Prompter.Event.ShortRest", { name: actor.name }));
+  addEvent("rest", localize("Prompter.Source.Rest"), localize(long ? "Prompter.Event.LongRest" : "Prompter.Event.ShortRest", { name: actor.name }), sheetPage(), { long });
+}
+
+/**
+ * The GM says the party rested (narrated, nobody clicked it on a sheet): rest beats wake and the log has it.
+ * @param {boolean} long
+ */
+export function gmRest(long) {
+  if ( !isActiveGM() ) return ui.notifications.warn(localize("Prompter.NotActiveGM"));
+  const label = localize("Prompter.Source.Rest");
+  lastHeard.delete(`rest||${long}`);
+  const found = hear({ kind: "rest", long }, { label });
+  addEvent("rest", label, localize(long ? "Prompter.Event.GMLongRest" : "Prompter.Event.GMShortRest"), sheetPage(), { long });
+  if ( !found.length ) ui.notifications.info(localize("Prompter.RestNothing", { rest: localize(long ? "Prompter.LongRest" : "Prompter.ShortRest") }));
+  return found;
 }
 
 const combatantNames = combat => [...new Set((combat?.combatants ?? []).map(c => c.name).filter(Boolean))].slice(0, 6).join(", ");
@@ -219,10 +253,12 @@ function onRoad() {
   for ( const stop of activeStops(atlas) ) {
     if ( known.stops.has(stop.id) ) continue;
     known.stops.add(stop.id);
+    // A stop made before this browser started listening is old news (see primedAt).
+    if ( olderThan(stop.date, primedAt) ) continue;
     const text = stop.label || "";
     if ( text ) hear({ kind: "place", text }, { label: localize("Prompter.Source.Atlas") });
     const when = [stop.day ? localize("Prompter.Event.Day", { day: stop.day }) : "", stop.time].filter(Boolean).join(" · ");
-    addEvent("move", localize("Prompter.Source.Atlas"), `→ ${text || "?"}${when ? ` (${when})` : ""}`);
+    addEvent("move", localize("Prompter.Source.Atlas"), `→ ${text || localize("Prompter.Somewhere")}${when ? ` (${when})` : ""}`, sheetPage(), { ref: `stop:${stop.id}` });
   }
 }
 
@@ -231,16 +267,17 @@ function onWhispers() {
   for ( const w of pw?.log?.().sent ?? [] ) {
     const names = (w.recipients ?? []).map(r => r.name ?? r.userName).filter(Boolean).join(", ");
     const what = w.title || snippet(w.html) || (w.img ? "🖼" : "");
-    const seen = known.whispers.get(w.id) ?? { readers: new Set(), logged: false };
+    const old = olderThan(w.sentAt, primedAt);
+    const seen = known.whispers.get(w.id) ?? { readers: old ? readers(w) : new Set(), logged: old };
     if ( !seen.logged && w.sentAt ) {
-      addEvent("whisper", localize("Prompter.Source.Whisper"), `→ ${names} «${what}»`);
+      addEvent("whisper", localize("Prompter.Source.Whisper"), `→ ${names} «${what}»`, sheetPage(), { ref: `whisper:${w.id}` });
       seen.logged = true;
     }
     const now = readers(w);
     for ( const userId of now ) {
       if ( seen.readers.has(userId) ) continue;
       const r = (w.recipients ?? []).find(x => x.userId === userId);
-      addEvent("read", localize("Prompter.Source.Whisper"), localize("Prompter.Event.Read", { name: r?.name ?? r?.userName ?? "?", what }));
+      addEvent("read", localize("Prompter.Source.Whisper"), localize("Prompter.Event.Read", { name: r?.name ?? r?.userName ?? "?", what }), sheetPage(), { ref: `read:${w.id}:${userId}` });
     }
     seen.readers = now;
     known.whispers.set(w.id, seen);
@@ -255,7 +292,8 @@ function onPurse() {
   for ( const e of atlas?.purseLog?.() ?? [] ) {
     if ( known.purse.has(e.id) ) continue;
     known.purse.add(e.id);
-    addEvent("purse", localize("Prompter.Source.Purse"), [coinsText(e.delta), e.why, e.who ? `(${e.who})` : ""].filter(Boolean).join(" · "));
+    if ( olderThan(e.date, primedAt) ) continue;
+    addEvent("purse", localize("Prompter.Source.Purse"), [coinsText(e.delta), e.why, e.who ? `(${e.who})` : ""].filter(Boolean).join(" · "), sheetPage(), { ref: `purse:${e.id}` });
   }
 }
 

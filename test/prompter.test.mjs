@@ -167,7 +167,8 @@ test("live log: deck rows, misses, sleepers, notes, events, answers", () => {
   assert.match(md, /\| ✗ \| 👂 \| Quiet, please \|/);
   assert.match(md, /\| ☐ \| 🟡 \| The forged deed \| #8 #53 \| \*\*not played → missed ×1\*\* \|/);
   assert.match(md, /\| 💤 \| ⚪ \| Night whispers \|/);
-  assert.match(md, /\*\*Played\*\* 3:30/);
+  // Played runs to the last thing at the table (19:20), not to Close (0.6.2: a Close the next day read as 16 hours).
+  assert.match(md, /\*\*Played\*\* 1:20 · \*\*Last at the table\*\* \d\d:\d\d/);
   assert.match(md, /`#paid` the guide, 3 gp/);
   assert.match(md, /\*\*Whisper\*\* → Ilsa «Snow»/);
   assert.match(md, /1\. \*\*What did Ilsa hold\?\*\*\n {3}a kitchen knife/);
@@ -186,4 +187,67 @@ test("beat callouts: GM view only, with a priority class; players never see them
   const player = M.convertMarkdown(md, { render, parseFragment, gm: false }).html;
   assert.doesNotMatch(player, /Secret beat|the body|psst/);
   assert.match(player, /Visible/);
+});
+
+/* ---- 0.6.2: Session 03 fixes ---- */
+
+test("absentFor names the heroes a sleeping beat waits for", () => {
+  const beat = { pc: ["Elaion", "Dumien"] };
+  const present = n => n === "Dumien";
+  assert.deepEqual(P.absentFor(beat, present), ["Elaion"]);
+  assert.deepEqual(P.absentFor({ pc: [] }, present), []);
+});
+
+test("isNight reads the Atlas parts of the day in both languages", () => {
+  for ( const b of ["νύχτα", "Night", "αντιζενίθ", "antipeak", "μεσάνυχτα"] ) assert.ok(P.isNight(b), b);
+  for ( const b of ["ζενίθ", "morning", "", null] ) assert.ok(!P.isNight(b), String(b));
+});
+
+const runAt = (start, events = [], extra = {}) => ({ active: true, startedAt: start, closedAt: null, beats: {}, notes: [], events, ...extra });
+
+test("lastActivity ignores the Prompter's own open and close", () => {
+  const r = runAt("2026-11-06T20:20:00.000Z", [
+    { t: "2026-11-06T20:20:00.000Z", kind: "session" },
+    { t: "2026-11-06T23:21:00.000Z", kind: "rest" },
+    { t: "2026-11-07T13:09:00.000Z", kind: "session" }
+  ], { notes: [{ t: "2026-11-06T22:00:00.000Z" }], beats: { a: { s: "played", t: "2026-11-06T23:26:00.000Z" } } });
+  assert.equal(P.lastActivity(r), "2026-11-06T23:26:00.000Z");
+  assert.equal(P.lastActivity(runAt(null)), null);
+});
+
+test("playedMs stops at the last thing at the table, not at a Close the next afternoon", () => {
+  const r = runAt("2026-11-06T20:20:00.000Z", [{ t: "2026-11-06T23:26:00.000Z", kind: "move" }], { closedAt: "2026-11-07T13:09:00.000Z" });
+  assert.equal(P.duration(P.playedMs(r)), "3:06");
+  const early = runAt("2026-11-06T20:20:00.000Z", [{ t: "2026-11-06T23:26:00.000Z", kind: "move" }], { closedAt: "2026-11-06T22:20:00.000Z" });
+  assert.equal(P.duration(P.playedMs(early)), "2:00");
+  assert.equal(P.playedMs(runAt(null)), null);
+});
+
+test("closeNudge offers to close after a Long Rest or a quiet half hour, and respects 'not yet'", () => {
+  const t0 = Date.parse("2026-11-06T23:21:00.000Z");
+  const rest = runAt("2026-11-06T20:20:00.000Z", [{ t: "2026-11-06T23:21:00.000Z", kind: "rest", long: true }]);
+  assert.equal(P.closeNudge(rest, t0 + 60000), "rest");
+  assert.equal(P.closeNudge(rest, t0 + 60000, { dismissedAt: "2026-11-06T23:21:00.000Z" }), null);
+  const short = runAt("2026-11-06T20:20:00.000Z", [{ t: "2026-11-06T23:21:00.000Z", kind: "rest", long: false }]);
+  assert.equal(P.closeNudge(short, t0 + 5 * 60000), null);
+  assert.equal(P.closeNudge(short, t0 + 31 * 60000), "idle");
+  assert.equal(P.closeNudge({ ...short, active: false }, t0 + 31 * 60000), null);
+});
+
+test("olderThan: stamped items before the Prompter listened are old news", () => {
+  assert.ok(P.olderThan("2026-11-06T22:00:00.000Z", "2026-11-07T01:23:00.000Z"));
+  assert.ok(!P.olderThan("2026-11-07T01:24:00.000Z", "2026-11-07T01:23:00.000Z"));
+  assert.ok(!P.olderThan(undefined, "2026-11-07T01:23:00.000Z"));
+  assert.ok(!P.olderThan("2026-11-06T22:00:00.000Z", null));
+});
+
+test("the live log names absent heroes and uses the played time", () => {
+  const beats = P.parseBeats("> [!beat|should|pc=Elaion] Elaion arrives\n>\n> body\n");
+  const md = P.buildLiveLog({
+    sheetName: "Session 04 - run sheet", session: "4", beats,
+    state: runAt("2026-11-06T20:20:00.000Z", [{ t: "2026-11-06T23:26:00.000Z", kind: "move", label: "Atlas", text: "→ x" }], { closedAt: "2026-11-07T13:09:00.000Z" }),
+    asleep: () => true, absent: () => ["Elaion"]
+  });
+  assert.match(md, /💤 Elaion absent \(not counted\)/);
+  assert.match(md, /\*\*Played\*\* 3:06/);
 });

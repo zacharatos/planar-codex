@@ -3,6 +3,24 @@
 All notable changes to this module. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 The release workflow uses the section matching the tag as the GitHub release notes, so keep the `## [x.y.z]` headings exact.
 
+## [Unreleased]
+
+Fixes from Session 03 (the Prompter at the table). Version number to be set at release.
+
+### Fixed
+- The console window (Prompter and Lens) scrolls: long decks and Lens stacks were cut off at the bottom.
+- **Presence:** who is at the table is snapshotted at *Start* and kept for the whole run, so a live log written after the players logged off no longer marks every hero absent and every hero card asleep. A player who joins mid-session puts their hero at the table; a dropped connection doesn't take them out.
+- A misclicked ✓ / ✗ / ⏩ can be undone from a bar at the bottom of the window for a few seconds; ✓ and ✗ are bigger and further from the title. A played card's *where* is only what called it (when it was hot), not the last thing heard.
+- Reloading Foundry mid-session (or Planar Atlas loading after Codex) no longer replays the whole road into the log: stops, purse lines and private lines made before the Prompter started listening are old news, and every logged event carries a reference so it is never logged twice.
+- An Atlas stop with no name logs as "somewhere on the map" instead of «?» (Planar Atlas now names it "near «X»").
+- *Played* in the live log runs from Start to the last thing that happened at the table (a Close the next afternoon read as 16 hours); the log also shows *Last at the table*.
+
+### Added
+- **Long Rest** and **Short Rest** buttons in the Prompter's header: wake the cards waiting for a rest that was narrated, not clicked on a sheet (the Long Rest button glows at night on the Atlas clock).
+- A person icon beside each hero in the spotlight switches them in or out of tonight's table (guest heroes, a player who leaves early); a sleeping card says who it waits for.
+- A banner in a GM browser that isn't the active GM: nothing is heard or logged there.
+- An offer to close the session after a Long Rest or 30 minutes with nothing at the table; closing long after the last event offers "Close as of <time>".
+
 ## [0.6.1]
 
 ### Added

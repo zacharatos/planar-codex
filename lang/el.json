@@ -249,8 +249,29 @@
         "Death": "Ο/Η {name} πέθανε (θάνατος {n}): {cause}",
         "Return": "Ο/Η {name} επέστρεψε · {glitches}",
         "Read": "Ο/Η {name} διάβασε «{what}»",
-        "Day": "Μέρα {day}"
-      }
+        "Day": "Μέρα {day}",
+        "GMLongRest": "Long Rest (ο GM)",
+        "GMShortRest": "Short Rest (ο GM)",
+        "Joined": "{name}: ήρθε στο τραπέζι"
+      },
+      "LongRest": "Long Rest",
+      "ShortRest": "Short Rest",
+      "RestTip": "Η ομάδα πήρε {rest} (αφηγηματικά, χωρίς κλικ στα φύλλα): ξυπνούν οι κάρτες που την περιμένουν και γράφεται στο log.",
+      "RestNothing": "{rest} καταγράφηκε. Καμία κάρτα δεν την περίμενε.",
+      "NotActiveGM": "Αυτός ο browser δεν είναι ο ενεργός GM: εδώ δεν ακούγεται ούτε καταγράφεται τίποτα. Χρησιμοποίησε τον browser του ενεργού GM (ή κλείσε την άλλη καρτέλα GM).",
+      "HeroIn": "{name}: στο τραπέζι απόψε. Κλικ: απών απόψε.",
+      "HeroOut": "{name}: απών απόψε. Κλικ: στο τραπέζι.",
+      "AbsentShort": "απών",
+      "AsleepWhy": "Περιμένει: {names} (απών)",
+      "Undo": "Αναίρεση",
+      "UndoPlayed": "Έγινε: {title}",
+      "UndoSkipped": "Όχι απόψε: {title}",
+      "UndoLater": "Αργότερα: {title}",
+      "NudgeRest": "Πήραν Long Rest. Τέλος της βραδιάς;",
+      "NudgeIdle": "Τίποτα εδώ και {min} λεπτά. Τέλος της βραδιάς;",
+      "NotYet": "Όχι ακόμα",
+      "CloseAsOf": "Κλείσιμο στις {time}, το τελευταίο που έγινε στο τραπέζι (όχι τώρα)",
+      "Somewhere": "κάπου στον χάρτη"
     },
     "Lens": {
       "Title": "Φακός",

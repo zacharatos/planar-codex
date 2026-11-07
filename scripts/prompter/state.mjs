@@ -3,13 +3,16 @@
  *
  * One hidden world setting, `prompter`: { sheet: <page uuid>, runs: { <page uuid>: run } }.
  * A run is one session played from one run sheet:
- *   { session, startedAt, closedAt, active, beats: {<beat id>: {s, t, where}}, notes: [], events: [], answers: {}, logUuid }
+ *   { session, startedAt, closedAt, active, beats: {<beat id>: {s, t, where}}, notes: [], events: [], answers: {}, logUuid,
+ *     present: {<actor id>: boolean} | undefined }
+ * `present` is who was at the table, snapshotted at Start (then GM toggles and late arrivals); events may carry a `ref`
+ * (e.g. "stop:<id>") so the same thing is never logged twice, even after a reload.
  * Only the GM writes it. Writes are coalesced (a Theater fade or a burst of hooks becomes one save).
  */
 import { MODULE_ID, getMarkdown, isCodexPage } from "../codex.mjs";
 import { splitFrontmatter } from "../markdown.mjs";
 import { playersFor } from "../actions.mjs";
-import { parseBeats, parseCloseout, sessionOf, isAsleep, fold } from "./core.mjs";
+import { parseBeats, parseCloseout, sessionOf, isAsleep, absentFor, fold } from "./core.mjs";
 
 export const SETTING = "prompter";
 const MAX_EVENTS = 400;
@@ -143,32 +146,59 @@ export function removeNote(id, page = sheetPage()) {
   mutateRun(r => { r.notes = r.notes.filter(n => n.id !== id); }, page);
 }
 
-/** Record something the modules saw. Only while a session runs. */
-export function addEvent(kind, label, text, page = sheetPage()) {
+/** Record something the modules saw. Only while a session runs. `extra` ({ref, long, …}) is kept on the event. */
+export function addEvent(kind, label, text, page = sheetPage(), extra = {}) {
   if ( !run(page).active ) return;
+  if ( extra.ref && hasEvent(extra.ref, page) ) return;
   mutateRun(r => {
-    r.events.push({ t: new Date().toISOString(), kind, label, text: String(text ?? "") });
+    r.events.push({ ...extra, t: new Date().toISOString(), kind, label, text: String(text ?? "") });
     if ( r.events.length > MAX_EVENTS ) r.events = r.events.slice(-MAX_EVENTS);
   }, page);
+}
+
+/** Has this run already logged something with that ref? */
+export function hasEvent(ref, page = sheetPage()) {
+  return !!ref && (run(page).events ?? []).some(e => e.ref === ref);
 }
 
 /* -------------------------------------------- */
 /*  Who is at the table                         */
 /* -------------------------------------------- */
 
-/** Is a hero (by name, as written in `pc=`) played by someone who is logged in? Unknown names count as present. */
-export function isPresent(name) {
+const playerCharacters = () => game.actors.filter(a => a.type === "character" && a.hasPlayerOwner);
+/** Is a player who owns this actor logged in right now? */
+const loggedIn = actor => game.users.some(u => !u.isGM && u.active && actor.testUserPermission(u, "OWNER"));
+
+/** Who is logged in now, per hero: {<actor id>: boolean}. */
+export const livePresence = () => Object.fromEntries(playerCharacters().map(a => [a.id, loggedIn(a)]));
+
+/**
+ * Is a hero (by name, as written in `pc=`) at the table? The run's snapshot (taken at Start, then GM toggles and late
+ * arrivals) decides; before any snapshot, whoever is logged in. Unknown names count as present.
+ * So a log written the next afternoon, with nobody online, still shows who played.
+ */
+export function isPresent(name, page = sheetPage()) {
   const { users, actor } = playersFor(name);
   if ( !actor && !users.length ) return true;
+  const snap = run(page).present;
+  if ( actor && snap && actor.id in snap ) return !!snap[actor.id];
   return users.some(u => u.active);
 }
 
-export const asleep = beat => isAsleep(beat, isPresent);
+export const asleep = beat => isAsleep(beat, name => isPresent(name));
+/** The heroes a sleeping beat waits for. */
+export const absentHeroes = beat => absentFor(beat, name => isPresent(name));
 
-/** The player characters, for the spotlight. */
-export function heroes() {
-  return game.actors.filter(a => a.type === "character" && a.hasPlayerOwner)
-    .map(a => ({ actor: a, name: a.name, short: a.name.split(/\s+/)[0], present: game.users.some(u => !u.isGM && u.active && a.testUserPermission(u, "OWNER")) }))
+/** The GM moves a hero in or out of tonight's table (a guest hero, a player who left early). */
+export function setPresent(actorId, present, page = sheetPage()) {
+  mutateRun(r => { r.present = { ...(r.present ?? livePresence()), [actorId]: !!present }; }, page);
+}
+
+/** The player characters, for the spotlight (present per the run's snapshot, else who is logged in). */
+export function heroes(page = sheetPage()) {
+  const snap = run(page).present;
+  return playerCharacters()
+    .map(a => ({ actor: a, name: a.name, short: a.name.split(/\s+/)[0], present: snap && a.id in snap ? !!snap[a.id] : loggedIn(a) }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -179,13 +209,13 @@ export function heroes() {
 export function spotlight(page = sheetPage(), whispersSent = []) {
   const r = run(page);
   const beats = readSheet(page)?.beats ?? [];
-  return heroes().map(h => {
+  return heroes(page).map(h => {
     const key = fold(h.short);
     const named = list => list.some(n => { const f = fold(n); return f === key || fold(h.name) === f || f.startsWith(`${key} `) || key.startsWith(f); });
     let count = beats.filter(b => r.beats[b.id]?.s === "played" && named(b.pc)).length;
     count += whispersSent.filter(w => (w.recipients ?? []).some(x => x.actorId === h.actor.id || named([x.name ?? ""]))).length;
     count += r.notes.filter(n => fold(n.text).split(" ").includes(key)).length;
-    return { name: h.name, short: h.short, count, present: h.present };
+    return { name: h.name, short: h.short, count, present: h.present, actorId: h.actor.id };
   });
 }
 

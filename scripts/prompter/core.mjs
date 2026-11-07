@@ -229,6 +229,73 @@ export function isAsleep(beat, present) {
   return !beat.pc.some(name => present(name));
 }
 
+/** The heroes a sleeping beat waits for (its `pc=` names that aren't at the table), for "💤 Elaion absent". */
+export function absentFor(beat, present) {
+  if ( !beat.pc.length || !present ) return [];
+  return beat.pc.filter(name => !present(name));
+}
+
+/** Is a part of the day (Planar Atlas clock band, either language) night-time? */
+export function isNight(band) {
+  const f = fold(band);
+  return !!f && ["night", "midnight", "antipeak", "νυχτα", "μεσανυχτα", "αντιζενιθ"].some(k => f.includes(k));
+}
+
+/* -------------------------------------------- */
+/*  Time at the table                           */
+/* -------------------------------------------- */
+
+/**
+ * When something last happened at the table: the latest event (not the Prompter's own open/close), note or beat change.
+ * @param {object} state  a run
+ * @returns {string|null} ISO time
+ */
+export function lastActivity(state) {
+  const times = [
+    ...(state?.events ?? []).filter(e => e.kind !== "session").map(e => e.t),
+    ...(state?.notes ?? []).map(n => n.t),
+    ...Object.values(state?.beats ?? {}).map(b => b?.t)
+  ].filter(t => typeof t === "string" && !Number.isNaN(new Date(t).getTime()));
+  return times.length ? times.reduce((a, b) => (a > b ? a : b)) : null;
+}
+
+/**
+ * How long the session was played: from Start to the last thing that happened at the table (or to Close, if earlier).
+ * A session closed the next afternoon still reads as the evening it was.
+ * @returns {number|null} milliseconds
+ */
+export function playedMs(state) {
+  const start = state?.startedAt ? new Date(state.startedAt).getTime() : NaN;
+  if ( Number.isNaN(start) ) return null;
+  const last = lastActivity(state);
+  const ends = [state?.closedAt, last].filter(Boolean).map(t => new Date(t).getTime()).filter(n => !Number.isNaN(n) && n >= start);
+  return ends.length ? Math.min(...ends) - start : null;
+}
+
+/**
+ * Should the Prompter offer to close the session?
+ *  "rest"  the last thing that happened was a Long Rest (end of the evening, usually);
+ *  "idle"  nothing has happened for `idleMinutes`;
+ *  null    keep playing (or not running, or the GM said "not yet" since the last activity).
+ * @param {object} state            a run
+ * @param {number} now              Date.now()
+ * @param {object} [options]
+ * @param {number} [options.idleMinutes=30]
+ * @param {string|null} [options.dismissedAt]  the activity time the GM last said "not yet" to
+ */
+export function closeNudge(state, now, { idleMinutes = 30, dismissedAt = null } = {}) {
+  if ( !state?.active ) return null;
+  const last = lastActivity(state);
+  if ( !last || (dismissedAt && dismissedAt >= last) ) return null;
+  const events = (state.events ?? []).filter(e => e.kind !== "session");
+  const latest = events.reduce((a, e) => (!a || e.t > a.t ? e : a), null);
+  if ( latest && latest.kind === "rest" && latest.long && latest.t === last ) return "rest";
+  return now - new Date(last).getTime() >= idleMinutes * 60000 ? "idle" : null;
+}
+
+/** Is a stamped item (an Atlas stop, a purse line, a private line) older than a moment? Missing dates are not old. */
+export const olderThan = (iso, since) => !!iso && !!since && String(iso) < String(since);
+
 /* -------------------------------------------- */
 /*  Notes                                       */
 /* -------------------------------------------- */
@@ -267,9 +334,10 @@ export function duration(ms) {
  * @param {object} data.state         {startedAt, closedAt, beats: {id: {s, t, where}}, notes: [], events: [], answers: {}}
  * @param {string[]} [data.questions]
  * @param {(beat) => boolean} [data.asleep]
+ * @param {(beat) => string[]} [data.absent]  the heroes a sleeping beat waits for
  * @param {{name: string, count: number, present: boolean}[]} [data.spotlight]
  */
-export function buildLiveLog({ sheetName, session, beats, state, questions = [], asleep = () => false, spotlight = [] }) {
+export function buildLiveLog({ sheetName, session, beats, state, questions = [], asleep = () => false, absent = () => [], spotlight = [] }) {
   const st = state ?? {};
   const status = st.beats ?? {};
   const nn = pad2(session);
@@ -286,7 +354,7 @@ export function buildLiveLog({ sheetName, session, beats, state, questions = [],
     `# Session ${nn} — live log`,
     "",
     `> Written by the Prompter (Planar Codex) from [[${sheetName}]]. Raw material for the session log: Claude turns it into \`Sessions/\`, the dashboard, the ledger and the recap.`,
-    `> **Started** ${hhmm(st.startedAt) || "—"} · **Closed** ${hhmm(st.closedAt) || "—"}${st.startedAt && st.closedAt ? ` · **Played** ${duration(new Date(st.closedAt) - new Date(st.startedAt))}` : ""}`,
+    `> **Started** ${hhmm(st.startedAt) || "—"} · **Closed** ${hhmm(st.closedAt) || "—"}${playedMs(st) !== null ? ` · **Played** ${duration(playedMs(st))}` : ""}${lastActivity(st) ? ` · **Last at the table** ${hhmm(lastActivity(st))}` : ""}`,
     ""
   ].filter(l => l !== null);
 
@@ -299,7 +367,8 @@ export function buildLiveLog({ sheetName, session, beats, state, questions = [],
   for ( const b of skipped ) lines.push(row(b, "✗", `skipped ${hhmm(status[b.id].t)}`));
   for ( const b of open ) {
     const sleeping = asleep(b);
-    const note = sleeping ? "💤 hero absent (not counted)"
+    const who = sleeping ? absent(b) : [];
+    const note = sleeping ? `💤 ${who.length ? who.join(", ") : "hero"} absent (not counted)`
       : b.priority === "watch" ? "not heard tonight (stays in the deck)"
         : `**not played → missed ×${b.missed + 1}**`;
     lines.push(row(b, sleeping ? "💤" : "☐", note));

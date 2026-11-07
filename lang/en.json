@@ -249,8 +249,29 @@
         "Death": "{name} died (death {n}): {cause}",
         "Return": "{name} is back · {glitches}",
         "Read": "{name} read «{what}»",
-        "Day": "Day {day}"
-      }
+        "Day": "Day {day}",
+        "GMLongRest": "Long Rest (the GM)",
+        "GMShortRest": "Short Rest (the GM)",
+        "Joined": "{name} joined the table"
+      },
+      "LongRest": "Long Rest",
+      "ShortRest": "Short Rest",
+      "RestTip": "The party took a {rest} (narrated, not clicked on a sheet): wake the cards waiting for it and log it.",
+      "RestNothing": "{rest} logged. No card was waiting for it.",
+      "NotActiveGM": "This browser isn't the active GM: nothing is heard or logged here. Use the active GM's browser (or close the other GM tab).",
+      "HeroIn": "{name} is at the table tonight. Click: absent tonight.",
+      "HeroOut": "{name} is absent tonight. Click: at the table.",
+      "AbsentShort": "absent",
+      "AsleepWhy": "Waiting for: {names} (absent)",
+      "Undo": "Undo",
+      "UndoPlayed": "Played: {title}",
+      "UndoSkipped": "Not tonight: {title}",
+      "UndoLater": "Later: {title}",
+      "NudgeRest": "Long Rest taken. End of the evening?",
+      "NudgeIdle": "Nothing has happened for {min} minutes. End of the evening?",
+      "NotYet": "Not yet",
+      "CloseAsOf": "Close as of {time}, the last thing that happened at the table (not now)",
+      "Somewhere": "somewhere on the map"
     },
     "Lens": {
       "Title": "Lens",

@@ -452,7 +452,8 @@ img.codex-image { max-width: 100%; height: auto; border: none; border-radius: 4p
   --pr-text: #e9e4da; --pr-muted: #a9a294; --pr-rule: rgba(255, 255, 255, 0.1); --pr-card: rgba(255, 255, 255, 0.04);
   --pr-must: #d0544d; --pr-should: #d8a94a; --pr-fit: #8a8579; --pr-watch: #5f9e8f; --pr-hot: #f2c14e;
 }
-.codex-prompter .window-content { padding: 0; font-family: var(--codex-font); font-size: 14px; color: var(--pr-text); }
+/* V14 windows clip their content (overflow: hidden): the console scrolls itself, or long decks and Lens stacks are cut off. */
+.codex-prompter .window-content { padding: 0; font-family: var(--codex-font); font-size: 14px; color: var(--pr-text); overflow-y: auto; overscroll-behavior: contain; }
 .codex-prompter .prompter { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px; }
 .codex-prompter button { line-height: 1.2; }
 
@@ -472,7 +473,28 @@ img.codex-image { max-width: 100%; height: auto; border: none; border-radius: 4p
 .codex-prompter .pr-hero { flex: 0 0 auto; width: auto; padding: 2px 8px; border-radius: 12px; font-size: 12.5px; background: var(--pr-card); border: 1px solid var(--pr-rule); color: var(--pr-text); }
 .codex-prompter .pr-hero b { margin-left: 3px; }
 .codex-prompter .pr-hero.pr-zero { border-color: var(--pr-hot); box-shadow: 0 0 0 1px var(--pr-hot) inset; }
-.codex-prompter .pr-hero.pr-absent { opacity: 0.4; text-decoration: line-through; }
+.codex-prompter .pr-hero-chip { display: inline-flex; align-items: stretch; }
+.codex-prompter .pr-hero-chip .pr-hero { border-radius: 12px 0 0 12px; border-right: none; }
+.codex-prompter .pr-hero-toggle { flex: 0 0 auto; width: 26px; padding: 0; border-radius: 0 12px 12px 0; font-size: 11px; background: var(--pr-card); border: 1px solid var(--pr-rule); color: var(--pr-muted); }
+.codex-prompter .pr-hero-chip.pr-absent .pr-hero { opacity: 0.55; border-style: dashed; }
+.codex-prompter .pr-hero-chip.pr-absent .pr-hero-toggle { border-style: dashed; }
+/* Rest buttons: wake rest cards when the rest was narrated, not clicked on a sheet. */
+.codex-prompter .pr-rests { gap: 6px; }
+.codex-prompter .pr-rest { flex: 0 0 auto; width: auto; padding: 4px 10px; border-radius: 14px; font-size: 12.5px; }
+.codex-prompter .pr-rest.pr-glow { background: #2b2a45; color: #d9d6ff; border-color: #6c66c9; box-shadow: 0 0 8px rgba(108, 102, 201, 0.55); }
+/* Banners: this browser isn't the active GM; the offer to close. */
+.codex-prompter .pr-banner { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 7px 9px; border-radius: 6px; font-size: 13px; line-height: 1.35; }
+.codex-prompter .pr-banner > span { flex: 1; min-width: 12em; }
+.codex-prompter .pr-banner button { flex: 0 0 auto; width: auto; padding: 3px 10px; }
+.codex-prompter .pr-banner-warn { background: rgba(208, 84, 77, 0.18); border: 1px solid #8a4a45; color: #ffd2cf; }
+.codex-prompter .pr-banner-nudge { background: #262330; border: 1px solid #4b4466; color: var(--pr-text); }
+/* A sleeping card says who it waits for. */
+.codex-prompter .pr-asleep { padding: 0 8px 6px 22px; font-size: 12px; color: var(--pr-muted); }
+/* Undo after ✓ / ✗ / later: stays at the bottom of the window while it lasts. */
+.codex-prompter .pr-undo { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-top: 4px;
+  background: #29262c; border: 1px solid #4f8a5c; border-radius: 8px; box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.4); font-size: 13px; }
+.codex-prompter .pr-undo > span { flex: 1; }
+.codex-prompter .pr-undo button { flex: 0 0 auto; width: auto; padding: 4px 10px; background: #2f5d3a; color: #fff; border-color: #4f8a5c; font-weight: 700; }
 
 .codex-prompter .pr-section h3, .codex-prompter .pr-fold > summary {
   margin: 6px 0 4px; padding: 0; border: none; font-family: var(--codex-font); font-size: 12px; font-weight: 700;
@@ -509,8 +531,9 @@ img.codex-image { max-width: 100%; height: auto; border: none; border-radius: 4p
 .codex-prompter .pr-trig { background: rgba(216, 169, 74, 0.18); color: #f0d9a6; }
 .codex-prompter .pr-trig.pr-kind { background: transparent; border: 1px dashed rgba(216, 169, 74, 0.5); }
 .codex-prompter .pr-tag { background: rgba(95, 158, 143, 0.25); color: #c7ece2; }
-.codex-prompter .pr-btns { display: flex; gap: 3px; align-items: center; }
-.codex-prompter .pr-btn { flex: 0 0 auto; width: 28px; height: 26px; padding: 0; }
+/* ✓ and ✗ apart from the title and from each other: one stray click on the row used to mark a card played. */
+.codex-prompter .pr-btns { display: flex; gap: 6px; align-items: center; margin-left: 14px; }
+.codex-prompter .pr-btn { flex: 0 0 auto; width: 32px; height: 30px; padding: 0; }
 .codex-prompter .pr-btn.pr-ok:hover { background: #2f5d3a; color: #fff; }
 .codex-prompter .pr-btn.pr-no:hover { background: #5b2d2a; color: #fff; }
 .codex-prompter .pr-when { font-size: 12px; color: var(--pr-muted); }

@@ -130,11 +130,19 @@ Reading view (as GM, then as a player)
 
 Prompter (harness first: `npm run harness`, then /test/harness/prompter.html; `window.prompter.hear({kind: "place", text: "The Old Library"})` in the console)
 - A note with `[!beat]` callouts: the toolbar scroll button and Alt+D open the Prompter on it; the list button switches sheets.
+- A deck longer than the window (expand several cards): the console scrolls with the mouse wheel down to the note box; a re-render (tick a card) keeps the scroll position. Same in the Lens tab with a long stack.
 - Start: the `must` beats glow, a notification lists them; Planar Atlas's party window shows the session number; a sent whisper carries it.
 - Show a Theater place whose label contains a beat's `at=` name (stage, then over a map): the beat moves to *Now* with a notification. Move the Atlas party to a place: same. Take a Long Rest on a hero: `first Long Rest` beats come up.
 - Expand a card: rolls roll, links open, Whisper sends; once every private line on the card is sent, the beat is marked played, Show reads aloud.
 - ✓ / ✗ / ⏩ / undo, in the panel and on the beat box in the note: both stay in step.
-- Log out the player of a hero named in `pc=`: the beat moves to *Waiting for absent heroes*.
+- **Presence (two players logged in):** Start: the spotlight shows their heroes present, the others as "absent" (dashed); a card with `pc=` of an absent hero sits in *Waiting for absent heroes* and says "Waiting for: <name> (absent)". The person icon beside a hero switches them in or out; their cards wake or sleep at once.
+- Log a player out during the session: their hero stays present (the snapshot). Log in a player whose hero was absent: they join, the feed says "<name> joined the table". Close after both players log off: the live log still shows them present and names who each sleeping card waited for.
+- ✓ on a card: the bar "Played: <title> · Undo" stays at the bottom for ~6 s; Undo puts the card back as it was (also for ✗ and ⏩). ✓ on a card that wasn't hot: its *where* in the log is empty (not the last thing heard).
+- **Long Rest** / **Short Rest** in the header: the cards waiting for that rest wake (or "… logged. No card was waiting for it."), the feed logs "(the GM)". With the Atlas clock at night (*νύχτα*/*αντιζενίθ*) the Long Rest button glows.
+- Reload Foundry mid-session, then move the Atlas party: the log gets **one** new stop, not the whole road. Purse lines and private lines sent before the reload aren't logged again either. An Atlas stop away from any place reads "near «X»" (Atlas 0.2.2+), never «?».
+- Open a second GM tab: in the one that isn't the active GM, a red banner says nothing is heard or logged there.
+- After a Long Rest (or 30 min with nothing at the table, kept running), a banner offers *Close*; *Not yet* hides it until something new happens.
+- Close more than 45 min after the last event: the dialog offers "Close as of <time>" (ticked); the log's *Closed* and *Played* use that time; *Last at the table* shows it.
 - Notes with tags; delete one. The feed shows whispers sent and read, purse changes, stops, Heroic Inspiration, deaths.
 - Close: the dialog asks the close-out questions; a *Session NN - live log* note appears (in *Sessions* if there is one) and opens. Write it again from the header button: the same note is updated.
 - As a player: no toolbar button, no beat boxes in any note, Alt+D does nothing.
