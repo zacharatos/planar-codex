@@ -21,7 +21,7 @@ import {
 } from "./state.mjs";
 import { hotBeats, cool, hear, recentContexts, whispersSince, moduleApi, isActiveGM, gmRest } from "./context.mjs";
 import { lens, setLensTarget } from "../lens/index.mjs";
-import { renderLens, onLensClick, onLensSearch } from "../lens/view.mjs";
+import { renderLens, onLensClick, onLensSearch, labelTableCells } from "../lens/view.mjs";
 import { openLibrary, wireCitations } from "../library/index.mjs";
 
 const { ApplicationV2, DialogV2 } = foundry.applications.api;
@@ -437,7 +437,10 @@ export class PrompterPanel extends ApplicationV2 {
     if ( title && title.textContent !== this.title ) title.textContent = this.title;
     if ( this.tab === "prompter" ) await this.#fillBodies();
     // Place and NPC cards in the Lens: read-alouds get Show / Post, private lines get Whisper.
-    else for ( const el of root.querySelectorAll(".lens-deco") ) decorateCallouts(el, { source: el.dataset.source ?? "" });
+    else {
+      for ( const el of root.querySelectorAll(".lens-deco") ) decorateCallouts(el, { source: el.dataset.source ?? "" });
+      labelTableCells(root);
+    }
   }
 
   #tick() {

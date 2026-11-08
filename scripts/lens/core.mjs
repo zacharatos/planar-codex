@@ -324,6 +324,16 @@ export function mergeAcross(lists) {
   return out;
 }
 
+
+/**
+ * The as-played fields for an NPC card: npcs.md's own lines, plus a merged line from a prep note only when
+ * npcs.md has nothing of that kind (two «Want / Fear / Tell» lines read as a contradiction at the table).
+ */
+export function playedFields(fields) {
+  const own = new Set(fields.filter(f => !f.extra).map(f => f.kind));
+  return fields.filter(f => !f.extra || !own.has(f.kind));
+}
+
 /** One entry per person: a heading block and a table row about the same name become one (heading first). */
 export function mergePeople(list) {
   const out = [];

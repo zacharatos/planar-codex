@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import * as M from "../scripts/markdown.mjs";
-import { NoteIndex, linkReport, buildNameLookup, pickByName } from "../scripts/resolver.mjs";
+import { NoteIndex, linkReport, buildNameLookup, pickByName, withoutSourceTag } from "../scripts/resolver.mjs";
 import { planImport, diffImport, toVaultMarkdown, stripRoot, pathForNewNote } from "../scripts/vault.mjs";
 import { buildZip } from "../scripts/zip.mjs";
 import { render, parseFragment } from "./helpers.mjs";
@@ -176,6 +176,23 @@ test("typed-link name lookup: normalised names, type preference, first match oth
   assert.equal(pickByName(lookup, "brannoc").id, 4);
   assert.equal(pickByName(lookup, "nobody"), null);
   assert.equal(lookup.size, 2, "empty names are skipped");
+});
+
+test("typed links find actors named with an importer's source tag, and the other number", () => {
+  assert.equal(withoutSourceTag("Cranium Rat Squeaker (MPP)"), "Cranium Rat Squeaker");
+  assert.equal(withoutSourceTag("Bandit (MM'25)"), "Bandit");
+  assert.equal(withoutSourceTag("Bimdom Baffletrick (CRCotN)"), "Bimdom Baffletrick");
+  assert.equal(withoutSourceTag("Farrow (Glitch)"), null, "a state, not a source");
+  assert.equal(withoutSourceTag("Athar null (the philosopher)"), null);
+  const lookup = buildNameLookup([
+    { name: "Cranium Rat Squeaker (MPP)", id: 1 }, { name: "Farrow (ToFW)", id: 2 }, { name: "Farrow (Glitch)", id: 3 }, { name: "Zombie", id: 4 }
+  ]);
+  assert.equal(pickByName(lookup, "cranium rat squeakers").id, 1, "plural, without the tag");
+  assert.equal(pickByName(lookup, "cranium rat squeaker (mpp)").id, 1, "the full name still works");
+  assert.equal(pickByName(lookup, "farrow").id, 2);
+  assert.equal(pickByName(lookup, "farrow (glitch)").id, 3);
+  assert.equal(pickByName(lookup, "zombies").id, 4);
+  assert.equal(lookup.size, 4);
 });
 
 test("page updates are grouped by journal entry and cut into batches", async () => {

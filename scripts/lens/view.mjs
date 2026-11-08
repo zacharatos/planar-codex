@@ -8,7 +8,7 @@ import { localize, convert } from "../codex.mjs";
 import { escapeHTML } from "../markdown.mjs";
 import { lens, setLensTarget, togglePin } from "./index.mjs";
 import { gather } from "./data.mjs";
-import { stripMd, excerpt, plainText, voiceOf, wfhOf, eventsOf, eventRow } from "./core.mjs";
+import { stripMd, excerpt, plainText, voiceOf, wfhOf, eventsOf, eventRow, playedFields } from "./core.mjs";
 import { openLibrary } from "../library/index.mjs";
 
 const esc = escapeHTML;
@@ -165,7 +165,7 @@ function npcCard(c, data) {
 
   // How they were played (npcs.md): the as-played entry wins where it differs.
   const played = c.played ? `<details class="pr-fold lc-sec lc-played" open><summary>${localize("Lens.AsPlayed")}</summary><div class="lc-body">
-      ${c.played.person.fields.map(f => `<div class="lens-field lens-${f.kind}"><span class="lens-label">${esc(f.label)}</span> ${md(f.value)}</div>`).join("")}
+      ${playedFields(c.played.person.fields).map(f => `<div class="lens-field lens-${f.kind}"><span class="lens-label">${esc(f.label)}</span> ${md(f.value)}</div>`).join("")}
       <div class="lens-acts"><button type="button" class="lens-btn" data-lens="open" data-uuid="${esc(c.played.page.uuid)}" data-line="${c.played.person.line}"><i class="fa-solid fa-scroll"></i> ${esc(c.played.page.parent.name)}</button></div></div></details>` : "";
 
   return `<section class="lens-card lens-cardnote lens-npccard">
@@ -209,6 +209,18 @@ function people(data) {
   }).join("");
   return section("lens-people", "fa-solid fa-user-group", localize("Lens.People"), items);
 }
+
+/** Narrow windows: each table cell carries its column heading, so the CSS can stack the rows (Τι ξέρει, Μυστικά). */
+export function labelTableCells(root) {
+  for ( const table of root.querySelectorAll(".lc-body table") ) {
+    const heads = [...table.querySelectorAll("thead th")].map(th => th.textContent.trim());
+    if ( !heads.length ) continue;
+    for ( const tr of table.querySelectorAll("tbody tr") ) {
+      [...tr.children].forEach((td, i) => { if ( heads[i] && !td.dataset.label ) td.dataset.label = heads[i]; });
+    }
+  }
+}
+
 
 function place(data) {
   const rows = [];

@@ -125,14 +125,34 @@ export function linkReport(notes, { assetExists = () => true } = {}) {
  */
 export function buildNameLookup(entries) {
   const map = new Map();
+  // Second chance: the name without an importer's source tag («Cranium Rat Squeaker (MPP)», «Bandit (MM'25)»).
+  const loose = new Map();
   for ( const e of entries ) {
     const key = normalizeKey(e?.name);
     if ( !key ) continue;
     const list = map.get(key);
     if ( list ) list.push(e);
     else map.set(key, [e]);
+    const bare = withoutSourceTag(e?.name);
+    if ( bare ) {
+      const k = normalizeKey(bare);
+      if ( !loose.has(k) ) loose.set(k, []);
+      loose.get(k).push(e);
+    }
   }
+  map.loose = loose;
   return map;
+}
+
+/**
+ * A name's trailing source tag, as Plutonium and other importers add it: «(MPP)», «(MM'25)», «(ToFW)», «(CRCotN)».
+ * Needs two capitals, so a state like «Farrow (Glitch)» or «(the philosopher)» stays part of the name.
+ * @returns {string|null} the name without the tag, or null when it has none
+ */
+export function withoutSourceTag(name) {
+  const m = String(name ?? "").match(/^(.*\S)\s*\(([A-Za-z0-9'’]{2,10})\)\s*$/);
+  if ( !m || (m[2].match(/[A-Z]/g) ?? []).length < 2 ) return null;
+  return m[1];
 }
 
 /**
@@ -143,7 +163,12 @@ export function buildNameLookup(entries) {
  * @param {string} [type]
  */
 export function pickByName(lookup, key, type = null) {
-  const list = lookup.get(key);
-  if ( !list ) return null;
-  return (type && list.find(e => e.type === type)) || list[0];
+  const pick = list => (list?.length ? (type && list.find(e => e.type === type)) || list[0] : null);
+  // Exact name first; then without the importer's source tag; then the other number («Squeakers» / «Squeaker»).
+  const keys = [key, key.endsWith("s") ? key.slice(0, -1) : `${key}s`];
+  for ( const k of keys ) {
+    const hit = pick(lookup.get(k)) ?? pick(lookup.loose?.get(k));
+    if ( hit ) return hit;
+  }
+  return null;
 }

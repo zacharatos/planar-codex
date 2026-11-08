@@ -259,3 +259,13 @@ test("mentionsIn: a live log's list shows the lines that name it, not the sectio
   const [hit] = L.mentionsIn(md, L.nameVariants("A Market Ward street"));
   assert.equal(hit.excerpt, "00:23 Theater A Market Ward street · 01:02 Theater A Market Ward street");
 });
+
+test("playedFields: a prep note's line only fills a kind npcs.md lacks", () => {
+  const fields = [
+    { kind: "wft", label: "Want / Fear / Tell", value: "coin / the Prison / two hoof taps" },
+    { kind: "status", label: "Status", value: "alive" },
+    { kind: "wft", label: "Want / Fear / Tell", value: "coin and company / the Prison / taps twice", extra: true },
+    { kind: "knows", label: "Knows", value: "the portals", extra: true }
+  ];
+  assert.deepEqual(L.playedFields(fields).map(f => f.value), ["coin / the Prison / two hoof taps", "alive", "the portals"]);
+});
