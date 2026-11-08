@@ -5,7 +5,9 @@
  *   node tools/ready-check.mjs <vault> [--note "Prep/Session 04 - run sheet.md"] [--json] [--assets]
  *
  *   --assets  also list every image the notes use (@Place, @Cast, embeds) with its path on the server, so you can
- *             check they are uploaded before the session (Visuals/WebP/<path> is dnd/<path> in Foundry's User Data)
+ *             check they are uploaded before the session (Visuals/WebP/<path> is dnd/<path> in Foundry's User Data),
+ *             the planned ones (a key whose image doesn't exist yet: the file to create), and the soundscapes
+ *             named by key (not checked: the soundscapes live in Foundry)
  *
  * Reads the notes with the module's own parsers (scripts/prompter/core.mjs, scripts/lens/core.mjs,
  * scripts/library/core.mjs) and lists what won't work at the table:
@@ -22,6 +24,10 @@
  * "starts with", then "contains"; a place's leading "NN - " doesn't count), so a button that finds nothing here won't
  * find anything at the table either. (Whether the image is also added to a Theater scene on the server can't be
  * checked from the vault.)
+ *
+ * Keys (Codex 0.9): a button or trigger can name a place or person by the `key:` of its note
+ * (`@Place[wayfarer+riaen]`, `@Cast[farrow@glitch]`, `at=wayfarer`). The check resolves it the way Codex does
+ * (scripts/keys/core.mjs): a key whose image isn't in Visuals/WebP yet is "planned", reported with the file to create.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -29,6 +35,7 @@ import { splitFrontmatter, fmList, citationRegex, DEFAULT_CITATION_PREFIXES } fr
 import { parseBeats, triggerMatches, isKindOfMoment, fold, inferKind, KINDS } from "../scripts/prompter/core.mjs";
 import * as L from "../scripts/lens/core.mjs";
 import { parseBookIndex } from "../scripts/library/core.mjs";
+import * as K from "../scripts/keys/core.mjs";
 
 /** Note types the module and the guide know. */
 export const TYPES = new Set(["state", "npcs", "ledger", "reference", "pc", "homebrew", "prep", "session", "handout", "template",
@@ -81,7 +88,13 @@ function listFiles(dir, re) {
 
 /** Everything the checks compare against. */
 export function readTable(vault, notes) {
-  const t = { atlas: [], theater: [], heroes: new Map(), ledger: new Set(), names: null, books: new Set(), people: [] };
+  const t = { atlas: [], theater: [], heroes: new Map(), ledger: new Set(), names: null, books: new Set(), people: [], things: new Map() };
+  // Keys: every place and NPC note with a `key:`.
+  for ( const n of notes.filter(x => ["place", "npc"].includes(x.type) && x.fm.key) ) {
+    const card = L.parseCard(n.text, n.type);
+    const key = String(n.fm.key).trim();
+    if ( !t.things.has(key) ) t.things.set(key, K.thingOf({ key, kind: n.type, title: card.name, names: [path.basename(n.path, ".md"), ...card.aliases], fm: n.fm }));
+  }
   // Atlas places: the names a stop is reported by.
   for ( const f of listFiles(path.join(vault, "Foundry", "atlas"), /-pack\.json$/) ) {
     try {
@@ -191,10 +204,36 @@ export function resolveAsset(assets, ref) {
 /** The server path of an image in the mirror. */
 export const serverPath = asset => `${SERVER_ROOT}/${asset.rel}`;
 
+/**
+ * A Theater button written with a key: the image name it resolves to, or a plan (the file to create).
+ * @returns {{ref: object, planned: string|null}|null}  null: not a key of any note
+ */
+export function resolveKeyRef(t, ref) {
+  if ( ref.kind !== "place" && ref.kind !== "cast" ) return null;
+  const p = K.parseKey(ref.name);
+  const thing = p ? t.things.get(p.base) : null;
+  if ( !thing ) return null;
+  const labels = t.assets.filter(a => a.group === ref.kind).map(a => a.label);
+  const thingFor = k => t.things.get(k) ?? null;
+  const r = ref.kind === "place" ? K.theaterPlace(thing, p, { thingFor, labels }) : K.theaterCast(thing, p, { labels });
+  return { ref: { ...ref, name: r.name }, planned: r.exists === false ? r.create : null };
+}
+
 function checkAssets(n, t, err, warn) {
   if ( !t.assets?.length ) return [];
   const used = [];
-  for ( const ref of assetRefs(n.text) ) {
+  const planned = [];
+  Object.defineProperty(used, "planned", { value: planned, enumerable: false });
+  for ( let ref of assetRefs(n.text) ) {
+    // A key: the name it resolves to, or a planned image (a warning, with the file to create).
+    const keyed = resolveKeyRef(t, ref);
+    if ( keyed?.planned ) {
+      const where = ref.kind === "place" ? "Visuals/WebP/Scenes/ChapterNN/ (or Places/)" : "Visuals/WebP/Characters/NPCs/<Part>/";
+      warn(`\`${ref.raw}\`: planned, no image yet. Create «${keyed.planned}» in ${where}; until then Codex shows a dashed chip`, ref.line);
+      planned.push({ ref, create: keyed.planned, folder: where });
+      continue;
+    }
+    if ( keyed ) ref = keyed.ref;
     const where = ref.kind === "place" ? "Visuals/WebP/Places or Scenes" : ref.kind === "cast" ? "an NPCs folder of Visuals/WebP" : "Visuals/WebP";
     if ( ref.kind === "link" ) {
       err(`\`${ref.raw}\`: a link to an image, which Codex shows as a broken link. Use a Theater button, or embed it with \`![[…webp]]\``, ref.line);
@@ -215,6 +254,31 @@ function checkAssets(n, t, err, warn) {
     else if ( hits.length > 1 ) warn(`\`${ref.raw}\`: ${hits.length} images have this exact name (${hits.map(serverPath).join(", ")})`, ref.line);
   }
   return used;
+}
+
+/**
+ * Soundscapes and Atlas places named by key. Soundscapes live in Foundry, so they are only listed (for --assets);
+ * an Atlas key must be a place id in the Atlas pack, or its note's `atlas:` name must be.
+ * @returns {{key: string, name: string, line: number}[]}  the soundscapes the notes name by key
+ */
+function checkKeyedButtons(n, t, warn) {
+  const src = withoutCode(n.text);
+  const lineAt = i => src.slice(0, i).split("\n").length - 1;
+  const scapes = [];
+  for ( const m of src.matchAll(/@(Scape|Atlas)\[[^\]\n]+\](?:\{[^}\n]*\})?/g) ) {
+    const b = K.splitButton(m[0]);
+    const p = b ? K.parseKey(b.target) : null;
+    if ( !p ) continue;
+    const thing = t.things.get(p.base);
+    if ( b.module === "Scape" ) {
+      if ( thing ) scapes.push({ key: p.key, name: K.scapeFor(thing).name, line: lineAt(m.index) });
+      continue;
+    }
+    if ( !t.atlas.length || ["pay", "set"].includes(b.head.split(":")[0].trim().toLowerCase()) ) continue;
+    const known = t.atlas.some(x => x.id === p.key) || (thing?.atlas && t.atlas.some(x => K.fold(x.el) === K.fold(thing.atlas) || K.fold(x.en) === K.fold(thing.atlas)));
+    if ( !known ) warn(`\`${m[0]}\`: planned, the Atlas pack has no place with the id «${p.key}»${thing?.atlas ? ` or the name «${thing.atlas}»` : ""} (add it to Foundry/atlas/build_pack.py)`, lineAt(m.index));
+  }
+  return scapes;
 }
 
 /* -------------------------------------------- */
@@ -294,7 +358,10 @@ export function checkNote(n, t, all = []) {
   }
 
   // Images: every Theater button and embed must reach an image in the WebP mirror (what goes to the server).
-  Object.defineProperty(out, "assets", { value: checkAssets(n, t, err, warn), enumerable: false });
+  const assets = checkAssets(n, t, err, warn);
+  Object.defineProperty(out, "assets", { value: assets, enumerable: false });
+  Object.defineProperty(out, "planned", { value: assets.planned ?? [], enumerable: false });
+  Object.defineProperty(out, "scapes", { value: checkKeyedButtons(n, t, warn), enumerable: false });
 
   // The deck.
   const beats = /\[!beat\b/i.test(n.text) ? parseBeats(n.text) : [];
@@ -343,12 +410,16 @@ function checkDeck(beats, n, t, all, err, warn) {
       if ( b.priority === "watch" ) continue;
       if ( isKindOfMoment(trig) ) continue;
       if ( KEYWORD_CONTEXTS.some(c => triggerMatches(trig, c)) ) continue;
-      const atlas = t.atlas.filter(p => triggerMatches(trig, { kind: "place", text: p.el }) || triggerMatches(trig, { kind: "place", text: p.en }));
-      const theater = t.theater.filter(l => triggerMatches(trig, { kind: "place", text: l }));
-      const person = t.people.some(p => [p.name, ...p.aliases].some(x => triggerMatches(trig, { kind: "npc", text: L.stripMd(x) })));
+      // A key stands for its note's names (Codex 0.9): `at=wayfarer` matches what the Atlas and Theater report.
+      const names = K.triggerNames(trig, k => t.things.get(k) ?? null);
+      const any = ctx => names.some(x => triggerMatches(x, ctx));
+      const atlas = t.atlas.filter(p => any({ kind: "place", text: p.el }) || any({ kind: "place", text: p.en }));
+      const theater = t.theater.filter(l => any({ kind: "place", text: l }));
+      const person = names.length > 1 && t.things.get(K.parseKey(trig)?.base)?.kind === "npc"
+        || t.people.some(p => [p.name, ...p.aliases].some(x => any({ kind: "npc", text: L.stripMd(x) })));
       for ( const p of atlas ) {
         placesNamed.add(p.id);
-        if ( triggerMatches(trig, { kind: "place", text: p.el }) ) placesNamed.add(`${p.id}:el`);
+        if ( any({ kind: "place", text: p.el }) ) placesNamed.add(`${p.id}:el`);
       }
       if ( !atlas.length && !theater.length && !person ) {
         warn(`${at}: «${trig}» isn't a name the Atlas, Theater or an NPC card reports: shown on the card, never matched. Start it with «any …» if that's meant`, b.line);
@@ -370,7 +441,10 @@ export function run(vault, { only = null } = {}) {
   const everything = readNotes(vault);
   const table = readTable(vault, everything);
   const notes = only ? everything.filter(n => n.path === only) : everything;
-  const all = notes.map(n => { const findings = checkNote(n, table, everything); return { path: n.path, findings, assets: findings.assets ?? [] }; });
+  const all = notes.map(n => {
+    const findings = checkNote(n, table, everything);
+    return { path: n.path, findings, assets: findings.assets ?? [], planned: findings.planned ?? [], scapes: findings.scapes ?? [] };
+  });
   const results = all.filter(r => r.findings.length);
   results.otherBooks = [...(table.otherBooks ?? [])].sort();
   // Every image the notes use, once, with where it lives on the server.
@@ -381,7 +455,19 @@ export function run(vault, { only = null } = {}) {
     if ( !e.notes.includes(r.path) ) e.notes.push(r.path);
   }
   results.assets = [...seen.values()].sort((a, b) => a.server.localeCompare(b.server));
-  for ( const r of results ) delete r.assets;
+  // Planned images (keys whose image doesn't exist yet) and soundscapes named by key, once each.
+  const once = (list, id, make) => {
+    const map = new Map();
+    for ( const r of all ) for ( const x of r[list] ) {
+      const k = id(x);
+      if ( !map.has(k) ) map.set(k, { ...make(x), notes: [] });
+      if ( !map.get(k).notes.includes(r.path) ) map.get(k).notes.push(r.path);
+    }
+    return [...map.values()];
+  };
+  results.planned = once("planned", x => x.create, x => ({ create: x.create, folder: x.folder, key: x.ref.name }));
+  results.scapes = once("scapes", x => x.name.toLowerCase(), x => ({ name: x.name, key: x.key }));
+  for ( const r of results ) { delete r.assets; delete r.planned; delete r.scapes; }
   return results;
 }
 
@@ -396,7 +482,7 @@ if ( isMain ) {
   const i = args.indexOf("--note");
   const only = i >= 0 ? args[i + 1]?.replace(/\\/g, "/") : null;
   const results = run(vault, { only });
-  if ( args.includes("--json") ) console.log(JSON.stringify(args.includes("--assets") ? { notes: [...results], otherBooks: results.otherBooks, assets: results.assets } : results, null, 2));
+  if ( args.includes("--json") ) console.log(JSON.stringify(args.includes("--assets") ? { notes: [...results], otherBooks: results.otherBooks, assets: results.assets, planned: results.planned, scapes: results.scapes } : results, null, 2));
   else {
     let e = 0, w = 0;
     for ( const r of results ) {
@@ -410,6 +496,14 @@ if ( isMain ) {
     if ( args.includes("--assets") ) {
       console.log(`\nImages used (${results.assets.length}): each must be on the server at User Data/<path> (upload Visuals/WebP → ${SERVER_ROOT}/ with the same folders)`);
       for ( const a of results.assets ) console.log(`  ${a.server}${only ? "" : `   ← ${a.notes.join(", ")}`}`);
+      if ( results.planned.length ) {
+        console.log(`\nPlanned images (${results.planned.length}): named by key in the notes, not made yet. Create them with these names and they work with no change to the notes`);
+        for ( const p of results.planned ) console.log(`  ${p.create}   (${p.folder})${only ? "" : `   ← ${p.notes.join(", ")}`}`);
+      }
+      if ( results.scapes.length ) {
+        console.log(`\nSoundscapes named by key (${results.scapes.length}; not checked: they live in Foundry's Soundboard)`);
+        for ( const sc of results.scapes ) console.log(`  «${sc.name}» ← ${sc.key}`);
+      }
     }
     console.log(`\n${e} error(s), ${w} warning(s) in ${results.length} note(s).`);
     process.exitCode = e ? 1 : 0;

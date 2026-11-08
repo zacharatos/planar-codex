@@ -111,8 +111,10 @@
   const P = await import("../../scripts/prompter/index.mjs");
   const Lens = await import("../../scripts/lens/index.mjs");
   const Lib = await import("../../scripts/library/index.mjs");
-  P.initPrompter(); Lens.initLens(); Lib.initLibrary();
-  P.readyPrompter(); Lens.readyLens();
+  const Keys = await import("../../scripts/keys/index.mjs");
+  P.initPrompter(); Lens.initLens(); Lib.initLibrary(); Keys.initKeys();
+  P.readyPrompter(); Lens.readyLens(); Keys.readyKeys();
+  window.keys = Keys.keysApi;
   window.prompter = P.prompterApi;
   window.lens = Lens;
   window.library = Lib;

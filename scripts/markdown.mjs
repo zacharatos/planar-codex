@@ -317,6 +317,9 @@ export function isAssetTarget(target) {
  * @property {(md: string) => object[]} [lexer]  With `parser`: render block by block and tag each top-level
  * @property {(tokens: object[]) => string} [parser]  element with `data-codex-line` (its 0-based source line), so the
  *                                              in-place editor can open where the reader is.
+ * @property {(raw: string) => ({text?: string, html?: string}|null)} [resolveButton]  GM view only: a module button
+ *                                              written with a key (`@Place[wayfarer+riaen]`) → the button with the
+ *                                              asset's real name (`text`), or a planned chip (`html`); null leaves it.
  */
 
 /**
@@ -327,7 +330,7 @@ export function isAssetTarget(target) {
  * @returns {{html: string, frontmatter: object, tasks: number}}
  */
 export function convertMarkdown(markdown, options) {
-  const { render, parseFragment, gm = false, resolveAsset = () => null, revealed = new Set(), notePath = "", lexer, parser } = options;
+  const { render, parseFragment, gm = false, resolveAsset = () => null, revealed = new Set(), notePath = "", lexer, parser, resolveButton = null } = options;
   const { data: frontmatter, body } = splitFrontmatter(markdown);
   const normalized = String(markdown ?? "").replace(/\r\n?/g, "\n").replace(/^\uFEFF/, "");
   const bodyLine = countNewlines(normalized.slice(0, normalized.length - body.length));
@@ -364,7 +367,15 @@ export function convertMarkdown(markdown, options) {
   // Roll labels: [[/check …]]{Label} — the label follows the token.
   text = text.replace(/(CODEXTOKEN\d+X)(\{[^}\n]*\})/g, (_, t, lbl) => token(tokens[Number(t.slice(10, -1))] + escapeHTML(lbl)));
   // Foundry document links and embeds written directly: @UUID[…]{…}, @Embed[…], &Reference[…]{…}
-  text = text.replace(/[@&][A-Za-z]+\[[^\]\n]+\](?:\{[^}\n]*\})?/g, m => token(escapeHTML(m)));
+  // In the GM view, a button written with a key becomes the module's real name, or a "planned" chip (0.9).
+  text = text.replace(/[@&][A-Za-z]+\[[^\]\n]+\](?:\{[^}\n]*\})?/g, m => {
+    let r = null;
+    if ( gm && resolveButton && m[0] === "@" ) {
+      try { r = resolveButton(m); } catch(err) { r = null; }
+    }
+    if ( r?.html ) return token(r.html);
+    return token(escapeHTML(r?.text ?? m));
+  });
 
   // Highlights.
   text = text.replace(/==([^=\n]+?)==/g, (_, inner) => `<mark>${inner}</mark>`);

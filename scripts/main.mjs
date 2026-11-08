@@ -19,6 +19,7 @@ import { PrompterPanel } from "./prompter/panel.mjs";
 import { initLens, readyLens, setLensTarget } from "./lens/index.mjs";
 import { gather as lensGather } from "./lens/data.mjs";
 import { initLibrary, libraryApi, openLibrary } from "./library/index.mjs";
+import { initKeys, readyKeys, keysApi } from "./keys/index.mjs";
 
 Hooks.once("init", () => {
   const register = (key, data) => game.settings.register(MODULE_ID, key, data);
@@ -70,6 +71,7 @@ Hooks.once("init", () => {
   initPrompter();
   initLens();
   initLibrary();
+  initKeys();
 
   game.keybindings.register(MODULE_ID, "editHere", {
     name: "PLANARCODEX.Keybindings.EditHere",
@@ -97,6 +99,7 @@ Hooks.once("init", () => {
     /** Open the Lens on a place (or person). */
     openPlace: name => { setLensTarget(name); return PrompterPanel.open({ tab: "lens" }); },
     library: libraryApi,
+    keys: keysApi,
     openImporter: () => new CodexImporter().render({ force: true }),
     openExporter: () => new CodexExporter().render({ force: true })
   };
@@ -112,6 +115,7 @@ Hooks.once("ready", async () => {
   if ( game.user === game.users.activeGM ) await refreshStoredContent();
   readyPrompter();
   readyLens();
+  readyKeys();
 });
 
 function applyFontSize(px) {

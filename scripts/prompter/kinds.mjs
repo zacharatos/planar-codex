@@ -7,6 +7,7 @@
 import { MODULE_ID, getMarkdown, updateMarkdown } from "../codex.mjs";
 import { inferKind, setBeatKind, hash, KINDS } from "./core.mjs";
 import { isPersonName } from "../lens/data.mjs";
+import { isPersonKey } from "../keys/index.mjs";
 
 const cache = new Map();
 
@@ -16,7 +17,7 @@ export function kindInfo(beat) {
   const key = `${beat.id}|${beat.kind ?? ""}|${hash(`${beat.title}\u0000${beat.at.join(";")}\u0000${beat.body}`)}`;
   let hit = cache.get(key);
   if ( !hit ) {
-    hit = inferKind(beat, { isPerson: name => { try { return isPersonName(name); } catch(err) { return false; } } });
+    hit = inferKind(beat, { isPerson: name => { try { return isPersonKey(name) || isPersonName(name); } catch(err) { return false; } } });
     if ( cache.size > 400 ) cache.clear();
     cache.set(key, hit);
   }

@@ -386,6 +386,19 @@
       "Reading": "Reading the folder…",
       "Done": "Library: {books} book(s), {chapters} chapter(s) imported.",
       "Failed": "Import failed"
+    },
+    "Keys": {
+      "Missing": {
+        "Place": "Theater: this image isn't on the server yet. Create {name}",
+        "Cast": "Theater: this NPC card isn't on the server yet. Create {name}",
+        "Scape": "Soundboard: no soundscape called «{name}» yet.",
+        "Cue": "Soundboard: no cue called «{name}» yet.",
+        "Atlas": "Atlas: no place with the id «{name}» yet.",
+        "Shop": "Store: no shop with the id «{name}» yet."
+      },
+      "CopyHint": "Click to copy the name.",
+      "Copied": "Copied: {name}",
+      "NotCopied": "Couldn't copy. The name is: {name}"
     }
   }
 }

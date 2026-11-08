@@ -386,6 +386,19 @@
       "Reading": "Διαβάζω τον φάκελο…",
       "Done": "Βιβλιοθήκη: εισήχθησαν {books} βιβλίο(α), {chapters} κεφάλαιο(α).",
       "Failed": "Η εισαγωγή απέτυχε"
+    },
+    "Keys": {
+      "Missing": {
+        "Place": "Theater: η εικόνα δεν είναι ακόμα στον server. Φτιάξε το {name}",
+        "Cast": "Theater: η κάρτα του NPC δεν είναι ακόμα στον server. Φτιάξε το {name}",
+        "Scape": "Soundboard: δεν υπάρχει ακόμα soundscape «{name}».",
+        "Cue": "Soundboard: δεν υπάρχει ακόμα cue «{name}».",
+        "Atlas": "Atlas: δεν υπάρχει ακόμα τόπος με id «{name}».",
+        "Shop": "Store: δεν υπάρχει ακόμα κατάστημα με id «{name}»."
+      },
+      "CopyHint": "Κλικ για αντιγραφή του ονόματος.",
+      "Copied": "Αντιγράφηκε: {name}",
+      "NotCopied": "Δεν αντιγράφηκε. Το όνομα είναι: {name}"
     }
   }
 }

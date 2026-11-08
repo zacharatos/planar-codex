@@ -76,8 +76,14 @@ export function cardOf(page, kind) {
     const theater = data.theater && typeof data.theater === "object" && !Array.isArray(data.theater) ? Object.values(data.theater).map(String) : list("theater");
     const names = [...new Set([page.parent?.name, card.name, ...card.aliases, ...list("aliases"), data.key ? String(data.key).replace(/-/g, " ") : null].filter(Boolean).map(n => L.stripMd(n)))];
     return { kind, page, card, key: data.key ? String(data.key) : null, theater, scape: list("scape"), atlas: data.atlas ? String(data.atlas) : null,
-      actor: data.actor ? String(data.actor) : null, book: list("book"), tags: list("tags"), names };
+      actor: data.actor ? String(data.actor) : null, book: list("book"), tags: list("tags"), names, fm: data };
   });
+}
+
+/** Every place and NPC note (Codex notes typed `place` / `npc`), as cards: what keys/index.mjs builds its keys from. */
+export function cardNotes() {
+  const notes = notesBy();
+  return [...notes.places.map(p => cardOf(p, "place")), ...notes.npcs.map(p => cardOf(p, "npc"))];
 }
 
 /** The card notes that a set of names (and the raw query, for a Theater label) is about. */

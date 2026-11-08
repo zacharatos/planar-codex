@@ -23,10 +23,20 @@ import { hotBeats, cool, hear, recentContexts, whispersSince, moduleApi, isActiv
 import { lens, setLensTarget } from "../lens/index.mjs";
 import { renderLens, onLensClick, onLensSearch, labelTableCells } from "../lens/view.mjs";
 import { openLibrary, wireCitations } from "../library/index.mjs";
+import { assetsVersion, thingFor } from "../keys/index.mjs";
+import { parseKey } from "../keys/core.mjs";
 
 const { ApplicationV2, DialogV2 } = foundry.applications.api;
 const TextEditorImpl = () => foundry.applications.ux.TextEditor.implementation;
 const esc = escapeHTML;
+
+/** A trigger chip: a key shows its note's name (the key itself in the tooltip). */
+function triggerChip(t) {
+  const p = parseKey(t);
+  const thing = p ? thingFor(p.base) : null;
+  const text = thing ? `${String(thing.title).split(/\s*\(/)[0]}${p.with.length ? ` + ${p.with.map(k => String(thingFor(k)?.title ?? k).split(/\s*\(/)[0]).join(" + ")}` : ""}` : t;
+  return `<span class="pr-trig ${isKindOfMoment(t) ? "pr-kind" : ""} ${thing ? "pr-trig-key" : ""}" ${thing ? `data-tooltip="${esc(t)}"` : ""}>${esc(text)}</span>`;
+}
 const hhmm = iso => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
 const DONE = ["played", "skipped"];
 const UNDO_MS = 6000;
@@ -302,7 +312,7 @@ export class PrompterPanel extends ApplicationV2 {
     const ledger = b.ledger.map(n => `<span class="pr-ledger">#${esc(n)}</span>`).join("");
     const missed = b.missed ? `<span class="pr-missed" data-tooltip="${esc(localize("Prompter.MissedTip", { n: b.missed }))}">×${b.missed}</span>` : "";
     const pcs = b.pc.map(n => `<span class="pr-pc">${esc(n)}</span>`).join("");
-    const trig = b.at.map(t => `<span class="pr-trig ${isKindOfMoment(t) ? "pr-kind" : ""}">${esc(t)}</span>`).join("");
+    const trig = b.at.map(triggerChip).join("");
     // A clue is found or not found; a whisper is sent; the rest are played or skipped.
     const ok = { clue: ["Prompter.Found", "fa-magnifying-glass-plus"], whisper: ["Prompter.Sent", "fa-check"] }[info.kind] ?? ["Prompter.Played", "fa-check"];
     const no = info.kind === "clue" ? ["Prompter.NotFound", "fa-eye-slash"] : ["Prompter.Skip", "fa-xmark"];
@@ -340,7 +350,7 @@ export class PrompterPanel extends ApplicationV2 {
     const open = this.expanded.has(b.id);
     const times = (r.events ?? []).filter(e => e.kind === "rule" && e.beat === b.id).map(e => hhmm(e.t));
     const sleeping = asleep(b);
-    const trig = b.at.map(t => `<span class="pr-trig ${isKindOfMoment(t) ? "pr-kind" : ""}">${esc(t)}</span>`).join("");
+    const trig = b.at.map(triggerChip).join("");
     const pcs = b.pc.map(n => `<span class="pr-pc">${esc(n)}</span>`).join("");
     const picker = this.picking.has(b.id) ? this.#kindPicker(b, info, false) : "";
     return `<article class="pr-card pr-kind-rule ${open ? "pr-open" : ""} ${sleeping ? "pr-sleeping" : ""}" data-beat="${esc(b.id)}">
@@ -462,7 +472,7 @@ export class PrompterPanel extends ApplicationV2 {
     for ( const el of this.element.querySelectorAll(".pr-body[data-body]") ) {
       const beat = beats.find(b => b.id === el.dataset.body);
       if ( !beat ) continue;
-      const key = `${page.uuid}|${beat.id}|${hash(beat.body)}`;
+      const key = `${page.uuid}|${beat.id}|${hash(beat.body)}|${assetsVersion()}`;
       let html = this.#bodies.get(key);
       if ( html === undefined ) {
         const { html: raw } = convert(beat.body || "", { gm: true, page });

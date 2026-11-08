@@ -3,6 +3,29 @@
 All notable changes to this module. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 The release workflow uses the section matching the tag as the GitHub release notes, so keep the `## [x.y.z]` headings exact.
 
+## [0.9.0]
+
+Codex "Cards", part 3: keys. A note can name a place, a person, an image or a soundscape before it exists, and it starts working the moment the thing is made with the expected name.
+
+### Added
+- **Keys in buttons.** Every place and person note has a `key:` (`wayfarer`, `riaen`). Module buttons can use it instead of the asset's real name: `@Place[wayfarer]`, `@Place[wayfarer+riaen]` (with a person in the shot), `@Place[prison@antipeak]` (a time of day, a point of view: `@eye`, `@inside`, `@outside`, or any moment word), `@Cast[farrow@glitch]`, `@Scape[wayfarer]`, `@Atlas[wayfarer | move]`, `@Shop[wayfarer-bar]`, and `[[actor:riaen]]`. In the GM view (notes, Prompter cards, rule boxes, the Lens) Codex puts in the real name: the note's own mapping first (`theater: {wayfarer+riaen: "…"}`, `scape:`, `actor:`, `atlas:`), then the note's `theater:` list, then what Theater, the Soundboard, the Atlas and the Store have on the server, by the naming templates. A button without a label gets the Greek names («Ο Πανταχού Οδοιπόρος + Ράιεν»). Buttons written with full names work as before.
+- **Planned chips.** When nothing on the server has that name yet, the button is a dashed chip (GM only; players never see module buttons) whose tooltip says exactly what to create, e.g. «Theater: this image isn't on the server yet. Create Ch02 - 19 - The Black Hood + Jet.webp», numbered like the place's other scenes. One click copies the name. Once the image, NPC card, soundscape, cue, Atlas place or shop exists, the chip becomes the working button, with no change to the note.
+- **Triggers by key.** `at=wayfarer` wakes a card whatever the table reports for that place: its Theater label, the Atlas's Greek name, any of the note's names. A key that is a person's (`at=riaen`) counts as a person for card kinds. Trigger chips on the cards show the note's name, with the key in the tooltip.
+- API: `api.keys.list()`, `api.keys.explain(key)` (what a key resolves to right now, and what's missing), `api.keys.resolveButton(text)`; `api.prompter.core.beatsFor` takes an optional fourth argument, the names a trigger stands for.
+
+### Ready check (`tools/ready-check.mjs`; not part of the installed module)
+- Theater buttons written with keys are resolved like Codex does, against `Visuals/WebP`. A key whose image doesn't exist yet is a warning, *planned*, with the file name to create and the folder to put it in; `--assets` lists the planned images and the soundscapes named by key (those live in Foundry, so they're listed, not checked); with `--json`, `planned` and `scapes` are added.
+- `@Atlas[key]`: a key that is neither an id in the Atlas pack nor its note's `atlas:` name is a warning.
+- Triggers written as keys are checked with their note's names: no more "isn't a name the Atlas reports" or "add the Greek name" for `at=wayfarer`.
+
+### Needs
+- Planar Soundboard with `scapes()` / `cues()` to check `@Cue` names (soundscapes are checked through its older `list()` too).
+
+## [0.8.2]
+
+### Fixed
+- The Library didn't scroll: a long section or chapter was cut off at the bottom of the window (V14 windows clip their content; the Library now scrolls itself, like the console, and the import window too). An empty Library shows its message once instead of twice.
+
 ## [0.8.1]
 
 Lens cards in a narrow window, after the first try at the table.
@@ -11,7 +34,6 @@ Lens cards in a narrow window, after the first try at the table.
 
 - Card tables (*Τι ξέρει*, *Μυστικά*) no longer run off the card: long words wrap, and in a narrow Lens each row stacks, with its column heading above each cell.
 - Rows with buttons (Atlas card, Move the party, Show, Open the shop) wrap cleanly and keep their buttons to the right, instead of floating at uneven heights.
-- The Library didn't scroll: a long section or chapter was cut off at the bottom of the window (V14 windows clip their content; the Library now scrolls itself, like the console, and the import window too). An empty Library shows its message once instead of twice.
 - Typed links (`[[monster:Cranium Rat Squeakers]]`, `[[actor:…]]`) missed actors imported with a source tag in their name (Plutonium's «Cranium Rat Squeaker (MPP)», «Bandit (MM'25)»): the lookup now tries the exact name, then the name without a tag of two or more capitals (so «Farrow (Glitch)» stays distinct), then singular / plural.
 - An NPC card's *As played* showed «Want / Fear / Tell» twice when a prep note had its own line for the same person: a prep note's line now shows only when `npcs.md` has nothing of that kind.
 

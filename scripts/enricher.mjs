@@ -6,7 +6,8 @@
  */
 import { MODULE_ID, codexPageOf, convert, getMarkdown, isCodexPage, localize } from "./codex.mjs";
 import { linkIndex } from "./link-index.mjs";
-import { escapeHTML, splitFrontmatter } from "./markdown.mjs";
+import { escapeHTML, splitFrontmatter, TYPE_PREFIXES } from "./markdown.mjs";
+import { actorNameForKey } from "./keys/index.mjs";
 
 const TextEditorImpl = () => foundry.applications.ux.TextEditor.implementation;
 
@@ -40,8 +41,12 @@ async function enrichLink(match, options = {}) {
   if ( typed ) {
     const prefix = typed[1].toLowerCase();
     const name = typed[2].trim();
-    const uuid = await linkIndex.resolveTyped(prefix, name);
-    if ( uuid ) return coreLink(uuid, null, label ?? name, options);
+    let uuid = await linkIndex.resolveTyped(prefix, name);
+    // `[[actor:riaen]]`: a person's key finds the actor named in the person's note (0.9).
+    const byKey = !uuid && TYPE_PREFIXES[prefix] === "Actor" ? actorNameForKey(name) : null;
+    if ( byKey ) uuid = await linkIndex.resolveTyped(prefix, byKey);
+    // A link written as the bare key shows the person's name, not the key.
+    if ( uuid ) return coreLink(uuid, null, byKey && (!label || label === name) ? byKey : label ?? name, options);
     return unresolved(label ?? name, raw, "typed");
   }
   const { target, heading } = splitTarget(raw);

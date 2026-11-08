@@ -8,6 +8,7 @@
  */
 import { MODULE_ID, localize } from "../codex.mjs";
 import { beatsFor, olderThan, plainTitle } from "./core.mjs";
+import { triggerNames } from "../keys/index.mjs";
 import { sheetPage, readSheet, run, asleep, addEvent, mutateRun, refresh } from "./state.mjs";
 import { kindOf } from "./kinds.mjs";
 import { showRuleToast } from "./toasts.mjs";
@@ -54,7 +55,7 @@ export function hear(context, { label = "", quiet = false } = {}) {
   const sheet = readSheet(page);
   if ( !sheet ) { refresh(); return []; }
   const where = [label, context.text].filter(Boolean).join(" · ");
-  const matched = beatsFor(sheet.beats, context, run(page).beats).filter(b => !asleep(b));
+  const matched = beatsFor(sheet.beats, context, run(page).beats, triggerNames).filter(b => !asleep(b));
   // Rule cards are reminders, not beats: a toast with the rule at its moment (every time), logged as "reminded".
   const rules = matched.filter(b => kindOf(b) === "rule");
   for ( const b of rules ) {

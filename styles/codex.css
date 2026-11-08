@@ -794,3 +794,19 @@ img.codex-image { max-width: 100%; height: auto; border: none; border-radius: 4p
   .codex-prompter .lc-body td:first-child::before { display: none; }
   .codex-prompter .lc-voice b, .codex-prompter .lc-wfh b { min-width: 4.5em; }
 }
+
+/* ----- Keys: something a note names that isn't on the server yet (0.9) ----- */
+.codex-planned {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0 0.45em;
+  border: 1px dashed var(--codex-muted, #a9a294);
+  border-radius: 4px;
+  color: var(--codex-muted, #a9a294);
+  font-style: italic;
+  cursor: copy;
+  white-space: nowrap;
+}
+.codex-planned:hover { color: inherit; border-color: currentColor; }
+.codex-prompter .pr-trig.pr-trig-key { cursor: help; }

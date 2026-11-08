@@ -60,6 +60,10 @@ export function resolveAsset(name) {
   return map[key] ?? map[key.split("/").pop()] ?? null;
 }
 
+/** GM view: module buttons written with keys (`@Place[wayfarer]`) are resolved by keys/index.mjs (set at init). */
+let buttonResolver = null;
+export function setButtonResolver(fn) { buttonResolver = typeof fn === "function" ? fn : null; }
+
 /**
  * Convert Markdown for a page. GM view includes DM-only material; player view is what we store.
  * @param {string} markdown
@@ -76,7 +80,8 @@ export function convert(markdown, { gm = false, page = null, path = null, lines 
     gm,
     resolveAsset,
     revealed: page ? revealedSecrets(page) : new Set(),
-    notePath: path ?? page?.getFlag(MODULE_ID, "path") ?? page?.uuid ?? ""
+    notePath: path ?? page?.getFlag(MODULE_ID, "path") ?? page?.uuid ?? "",
+    resolveButton: gm ? buttonResolver : null
   });
 }
 

@@ -255,9 +255,12 @@ export function triggerMatches(trigger, context) {
   return name.includes(t) || (t.includes(name) && name.length >= 4);
 }
 
-/** The beats a context makes "hot" (not yet played; sleeping ones included, the panel decides). */
-export function beatsFor(beats, context, status = {}) {
-  return beats.filter(b => !["played", "skipped"].includes(status[b.id]?.s) && b.at.some(t => triggerMatches(t, context)));
+/**
+ * The beats a context makes "hot" (not yet played; sleeping ones included, the panel decides).
+ * @param {(trigger: string) => string[]} [expand]  the names a trigger stands for (a key: its note's names, 0.9)
+ */
+export function beatsFor(beats, context, status = {}, expand = t => [t]) {
+  return beats.filter(b => !["played", "skipped"].includes(status[b.id]?.s) && b.at.some(t => expand(t).some(x => triggerMatches(x, context))));
 }
 
 /** Is a beat asleep: it names heroes and none of them is at the table? */

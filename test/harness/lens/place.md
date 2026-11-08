@@ -18,6 +18,7 @@ book: SRD, Ch. 2 › The Old Library
 
 ## Πού είναι
 - Low Ward, behind the fish market.
+- Keys (0.9): @Place[old-library] · @Place[old-library+marina]{Μαρίνα στο γραφείο} · @Cast[marina] · @Scape[old-library] · @Atlas[old-library | move]{Πάμε}
 
 ## Ανάγνωση
 > [!readaloud] Μπαίνοντας

@@ -124,6 +124,30 @@ The GM console (the Prompter's window) has a second tab, the **Lens** (Φακό�
 - **Check your notes:** `node tools/ready-check.mjs "<vault>"` (from a clone of this repo) lists what keeps a note from working with the Prompter and the Lens: a missing `type`, people without *want / fear / tell*, beat triggers that match nothing at the table, `@Place` / `@Cast` buttons and image embeds whose image isn't in the vault's `Visuals/WebP`. Add `--assets` for the list of images the notes use with their path on the server (`dnd/<path>`), and `--note "<path>"` to check one note, e.g. a run sheet before the session.
 - A first name finds the whole name ("Marina" finds "Marina Kollia") when nothing else is called just that.
 
+## Keys: name things before they exist
+
+Every place and person note has a **key** in its frontmatter: one lower-case English id, words joined by `-`, from the book's name (`key: wayfarer`, `key: riaen`). Write the key in a button or a trigger instead of the asset's real name, and it keeps working when images are renamed, and works the moment a missing one is made:
+
+| You want | Write |
+| --- | --- |
+| A Theater place by key | `@Place[wayfarer]` |
+| … with a person in the shot | `@Place[wayfarer+riaen]`, several: `@Place[wayfarer+riaen+parisa]` |
+| … at a time of day, from a point of view, at a moment | `@Place[prison@antipeak]`, `@Place[mortuary@eye]` (`eye`, `inside`, `outside`), `@Place[fortunes-wheel@marquee]` |
+| An NPC card, or a state of it | `@Cast[riaen]`, `@Cast[farrow@glitch]` |
+| The place's soundscape | `@Scape[wayfarer]` |
+| A cue | `@Cue[wayfarer - portal hum]` (`<key> - <what>`) |
+| The Atlas place, a shop | `@Atlas[wayfarer \| move]{Πάμε}`, `@Shop[wayfarer-bar]` |
+| The person's actor | `[[actor:riaen]]` |
+| A beat that wakes there, or with them | `> [!beat\|should\|at=wayfarer; riaen] …` |
+
+How a key finds its asset, in the GM view (players never see module buttons, only their labels):
+
+1. **The note says so:** `theater: {wayfarer: "Ch02 - 04 - The Ubiquitous Wayfarer", wayfarer+riaen: "…"}`, or a `theater:` list of labels; `scape:`; `actor:`; `atlas:`.
+2. **The naming templates,** from the note's English name: a Theater place label naming the place (and the person for `+key`, the word for `@word`), the NPC card named after the person (`Farrow (Glitch)` for `@glitch`), the soundscape named after the place, the actor named after the person. Atlas places and shops are found by id, which is the key.
+3. **Not on the server yet:** a dashed **planned** chip whose tooltip gives the exact name to create (numbered like the place's other scenes: `Ch02 - 19 - The Black Hood + Jet.webp`); a click copies it. Make it with that name and the chip becomes the button.
+
+A button without a `{label}` shows the note's Greek names. `node tools/ready-check.mjs "<vault>" --assets` lists the planned images; `api.keys.explain("wayfarer+riaen")` shows what a key resolves to right now.
+
 ## Library: the books, one click from any citation
 
 Import the books you own once, and every book citation in your notes (`` `ToFW, Ch. 2 › Harmonium Officers` ``) opens that section, GM only.
@@ -170,6 +194,7 @@ Other Obsidian callouts (`[!note]`, `[!warning]`, `[!tip]` …) render as colour
 type: npc            # free text; shown in the properties box
 aliases: [Brannoc, Μπράνοκ]   # other names [[links]] can use
 tags: [tavern]
+key: brannoc          # place and person notes: the stable id buttons and triggers can use (see Keys)
 actor: Brannoc         # the Foundry actor this note is about
 player: Ilsa Varn   # handouts: adds a "Share with Ilsa Varn" button (and "Reveal to Ilsa Varn" with Planar Whispers)
 visibility: players  # imported as visible to all players (default: GM only)

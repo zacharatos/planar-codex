@@ -122,3 +122,26 @@ test("ready check: place and NPC notes: name, key, sections the card knows", () 
   assert.ok(of("Campaign/Places/Typo.md").some(m => /section «Με μια ματια ξανά» isn't one the place card knows/.test(m)));
   assert.ok(of("Campaign/NPCs/Flat.md").some(m => /roleplay strip shows the section as text/.test(m)));
 });
+
+test("ready check: keys (0.9): buttons and triggers by key, planned images, soundscapes, Atlas ids", () => {
+  const dir = vault();
+  const w = (p, text) => { fs.mkdirSync(path.dirname(path.join(dir, p)), { recursive: true }); fs.writeFileSync(path.join(dir, p), text); };
+  w("Campaign/Places/The Old Library.md", "---\ntype: place\nkey: lib\naliases: [The Old Library, η Παλιά Βιβλιοθήκη]\nscape: Library hush\n---\n# Η Παλιά Βιβλιοθήκη (The Old Library)\n\n## Με μια ματιά\n- x\n");
+  w("Campaign/NPCs/Marina.md", "---\ntype: npc\nkey: marina\naliases: [Marina, Μαρίνα]\n---\n# Μαρίνα (Marina; archivist)\n\n## Ποια είναι\n- x\n");
+  w("Visuals/WebP/Characters/NPCs/Part 01/Marina.webp", "");
+  w("Prep/Session 03 - run sheet.md", "---\ntype: prep\n---\n" + [
+    "> [!beat|must|at=lib|pc=Ilsa] By key\n> @Place[lib] @Place[lib+marina]{Μαρίνα} @Cast[marina] @Cast[marina@angry] @Scape[lib] @Atlas[lib | move] @Atlas[attic]",
+    "> [!beat|should|kind=npc|at=marina|pc=Ilsa] Marina by key\n> x"
+  ].join("\n\n"));
+  const results = run(dir, { only: "Prep/Session 03 - run sheet.md" });
+  const msgs = (results[0]?.findings ?? []).map(f => `${f.level}: ${f.msg}`);
+  assert.ok(msgs.some(m => /^warn: `@Place\[lib\+marina\]`: planned.*«Ch01 - 01 - The Old Library \+ Marina\.webp»/.test(m)), "numbered like the library's image");
+  assert.ok(msgs.some(m => /^warn: `@Cast\[marina@angry\]`: planned.*«Marina \(Angry\)\.webp»/.test(m)));
+  assert.ok(msgs.some(m => /`@Atlas\[attic\]`: planned, the Atlas pack has no place with the id «attic»/.test(m)));
+  assert.ok(!msgs.some(m => /@Place\[lib\]`|@Cast\[marina\]`|@Atlas\[lib/.test(m)), "keys that resolve are fine");
+  assert.ok(!msgs.some(m => /isn't a name the Atlas/.test(m)), "at=lib and at=marina match by their notes");
+  assert.ok(!msgs.some(m => /add the Greek name/.test(m)), "a key stands for the Greek name too");
+  assert.deepEqual(results.planned.map(p => p.create).sort(), ["Ch01 - 01 - The Old Library + Marina.webp", "Marina (Angry).webp"]);
+  assert.deepEqual(results.scapes.map(s => s.name), ["Library hush"]);
+  assert.ok(results.assets.some(a => a.server === "dnd/Scenes/Ch01 - 01 - The Old Library.webp"));
+});
