@@ -8,7 +8,7 @@ import { localize, convert } from "../codex.mjs";
 import { escapeHTML } from "../markdown.mjs";
 import { lens, setLensTarget, togglePin } from "./index.mjs";
 import { gather } from "./data.mjs";
-import { stripMd, excerpt, plainText } from "./core.mjs";
+import { stripMd, excerpt, plainText, voiceOf, wfhOf, eventsOf, eventRow } from "./core.mjs";
 import { openLibrary } from "../library/index.mjs";
 
 const esc = escapeHTML;
@@ -50,7 +50,7 @@ export async function renderLens() {
 
   const body = data.empty
     ? `<p class="lens-none">${localize("Lens.Nothing", { name: esc(data.names[0]) })}</p>`
-    : [people(data), place(data), factions(data), beats(data), tonight(data), threads(data), prep(data), sessions(data), notes(data)].join("");
+    : [...data.placeCards.map(c => placeCard(c, data)), ...data.npcCards.map(c => npcCard(c, data)), people(data), place(data), factions(data), beats(data), tonight(data), threads(data), prep(data), sessions(data), notes(data)].join("");
   const books = `<section class="lens-card lens-books"><h3><i class="fa-solid fa-book"></i> ${localize("Lens.Books")}</h3>
       ${data.cites.map(c => `<cite class="codex-cite">${esc(c)}</cite>`).join(" ")}
       <button type="button" class="lens-btn" data-lens="books" data-q="${esc(stripMd(data.names[0]))}"><i class="fa-solid fa-magnifying-glass"></i> ${localize("Lens.SearchBooks", { name: esc(data.names[0]) })}</button>
@@ -58,6 +58,126 @@ export async function renderLens() {
 
   const html = `<div class="lens">${search}${target}${body}${books}${history}</div>`;
   return TextEditorImpl().enrichHTML(html, { secrets: true, rollData: {} });
+}
+
+/* -------------------------------------------- */
+/*  Place and NPC cards (0.8)                   */
+/* -------------------------------------------- */
+
+/** A section's Markdown → HTML (callouts, tables, rolls and module buttons work after enrichment). */
+const block = (text, page) => convert(String(text ?? ""), { gm: true, page }).html;
+const greek = s => /[Ͱ-Ͽἀ-῿]/.test(s);
+
+/** A note section as a fold: `pr-fold` keeps it open or closed across re-renders. */
+function fold(c, sec, { open = true, cls = "" } = {}) {
+  if ( !sec?.body ) return "";
+  return `<details class="pr-fold lc-sec lc-${esc(sec.id ?? "other")} ${cls}" ${open ? "open" : ""}>
+    <summary>${esc(sec.heading)}</summary><div class="lc-body codex-page lens-deco" data-source="${esc(c.page.uuid)}">${block(sec.body, c.page)}</div></details>`;
+}
+
+/** Header: the note's own name, its other names, its role; the tags as small chips. */
+function cardHead(c, icon, extra = "") {
+  const other = c.card.aliases.filter(a => greek(a) !== greek(c.card.name)).slice(0, 2);
+  const tags = c.tags.filter(t => !["place", "npc"].includes(t.toLowerCase())).slice(0, 4);
+  return `<header class="lc-head">
+      <i class="${icon}"></i>
+      <div class="lc-names"><b>${esc(c.card.name || c.page.parent.name)}</b>${other.length ? ` <span class="lens-alias">${esc(other.join(", "))}</span>` : ""}
+        ${c.card.about ? `<div class="lens-about">${esc(c.card.about)}</div>` : ""}</div>
+      ${extra}
+    </header>${tags.length ? `<div class="lc-tags">${tags.map(t => `<span class="lc-tag">${esc(t)}</span>`).join("")}</div>` : ""}`;
+}
+
+const openBtn = c => `<button type="button" class="lens-btn" data-lens="open" data-uuid="${esc(c.page.uuid)}"><i class="fa-solid fa-file-lines"></i> ${localize("Lens.OpenNote")}</button>`;
+const cites = c => c.book.map(b => `<cite class="codex-cite">${esc(b)}</cite>`).join(" ");
+const sources = c => (c.card.intro ? `<details class="pr-fold lc-sec lc-intro"><summary>${localize("Lens.Sources")}</summary>
+    <div class="lc-body codex-page lens-deco" data-source="${esc(c.page.uuid)}">${block(c.card.intro, c.page)}</div></details>` : "");
+
+/** The other sections, under their own headings, after the known ones. */
+const others = (c, known) => c.card.sections.filter(sec => !sec.id || !known.includes(sec.id)).map(sec => fold(c, sec, { open: false })).join("");
+
+function placeCard(c, data) {
+  const by = c.card.by;
+  const stage = [...new Set([...c.theater, ...data.stage.map(t => t.label)])].slice(0, 6);
+  const sceneOf = label => data.stage.find(t => t.label === label)?.scene ?? "";
+  const buttons = [
+    ...stage.map(label => `<button type="button" class="lens-btn lc-theater" data-lens="stage" data-label="${esc(label)}" data-scene="${esc(sceneOf(label))}" data-tooltip="${esc(label)}"><i class="fa-solid fa-masks-theater"></i> ${esc(label.replace(/^Ch\d+\s*-\s*\d+\s*-\s*/i, ""))}</button>`),
+    stage.length ? `<button type="button" class="lens-btn" data-lens="stage-off" data-tooltip="${esc(localize("Lens.BackToMap"))}"><i class="fa-solid fa-eye-slash"></i></button>` : "",
+    ...c.scape.map(sc => `@Scape[${sc}]{♪ ${sc}}`),
+    data.place || c.atlas ? `<button type="button" class="lens-btn" data-lens="atlas-move" data-q="${esc(data.place?.name ?? c.atlas)}"><i class="fa-solid fa-person-walking-arrow-right"></i> ${localize("Lens.AtlasMove")}</button>` : "",
+    openBtn(c)
+  ].filter(Boolean).join(" ");
+  const status = data.place?.status ? `<span class="lens-status lens-st-${esc(data.place.status)}">${esc(word("PlaceStatus", data.place.status))}</span>` : "";
+
+  // Who is here: a chip per person with a note (want · fear on hover; click: their card), then the section itself.
+  const chips = (c.who ?? []).map(n => {
+    const w = wfhOf(n.card.by.wfh?.body);
+    const tip = [w.want && `${localize("Lens.Want")}: ${stripMd(w.want)}`, w.fear && `${localize("Lens.Fear")}: ${stripMd(w.fear)}`].filter(Boolean).join(" · ");
+    return `<button type="button" class="lc-chip" data-lens="name" data-q="${esc(n.card.name || n.page.parent.name)}" data-tooltip="${esc(tip)}"><i class="fa-solid fa-user"></i> ${esc(n.card.name || n.page.parent.name)}</button>`;
+  }).join("");
+  const who = by.who ? `<details class="pr-fold lc-sec lc-who" open><summary>${esc(by.who.heading)}</summary>
+      ${chips ? `<div class="lc-chips">${chips}</div>` : ""}<div class="lc-body codex-page lens-deco" data-source="${esc(c.page.uuid)}">${block(by.who.body, c.page)}</div></details>` : "";
+
+  // What can happen: the table with a die to roll on it.
+  const ev = by.events ? eventsOf(by.events.body) : null;
+  const events = !by.events ? "" : !ev ? fold(c, by.events) : `<details class="pr-fold lc-sec lc-events" open>
+      <summary>${esc(by.events.heading)} <button type="button" class="lens-btn lc-roll" data-lens="event-roll" data-die="${ev.die}" data-place="${esc(c.card.name)}" data-tooltip="${esc(localize("Lens.RollEvent"))}">🎲 d${ev.die}</button></summary>
+      <table class="lc-events-table"><tbody>${ev.rows.map((r, i) => `<tr data-row="${i}" data-n="${esc(r.n)}"><th>${esc(r.n)}</th><td>${md(r.text)}</td><td class="lc-when">${md(r.when)}</td></tr>`).join("")}</tbody></table></details>`;
+
+  return `<section class="lens-card lens-cardnote lens-placecard">
+      ${cardHead(c, "fa-solid fa-map-location-dot", status)}
+      <div class="lc-buttons">${buttons}</div>
+      ${by.glance ? `<div class="lc-glance codex-page lens-deco" data-source="${esc(c.page.uuid)}">${block(by.glance.body, c.page)}</div>` : ""}
+      ${fold(c, by.readaloud)}${fold(c, by.senses)}${fold(c, by.view, { open: false })}${who}${events}
+      ${fold(c, by.secrets, { open: false, cls: "lc-secret" })}${fold(c, by.whispers)}${fold(c, by.where, { open: false })}${fold(c, by.prices, { open: false })}${fold(c, by.remember, { open: false })}
+      ${others(c, ["glance", "readaloud", "senses", "view", "who", "events", "secrets", "whispers", "where", "prices", "remember"])}
+      ${sources(c)}${c.book.length ? `<div class="lc-books">${cites(c)}</div>` : ""}
+    </section>`;
+}
+
+function npcCard(c, data) {
+  const by = c.card.by;
+  const names = c.names.map(n => n.toLowerCase());
+  const contact = data.contacts.find(x => names.includes(String(x.name).toLowerCase()));
+  const att = contact ? `<span class="lens-att lens-att-${esc(contact.attitude)}" data-tooltip="${esc(contact.factionName ?? "")}">${esc(word("Attitude", contact.attitude))}</span>` : "";
+  const theaterCard = data.cards.find(t => c.names.some(n => String(t.label).toLowerCase().includes(n.toLowerCase())));
+  const actorName = c.actor || c.card.aliases.find(a => !greek(a)) || c.card.name;
+  const actor = game.actors?.getName?.(actorName);
+  const buttons = [
+    theaterCard ? `<button type="button" class="lens-btn" data-lens="card" data-label="${esc(theaterCard.label)}" data-scene="${esc(theaterCard.scene)}"><i class="fa-solid fa-user"></i> ${localize("Lens.Card")}</button>` : "",
+    actor ? `<button type="button" class="lens-btn" data-lens="actor" data-uuid="${esc(actor.uuid)}"><i class="fa-solid fa-id-card"></i> ${localize("Lens.Sheet")}</button>` : "",
+    openBtn(c)
+  ].filter(Boolean).join(" ");
+
+  // The roleplay strip: always in sight.
+  const v = voiceOf(by.voice?.body);
+  const lines = v.lines ? v.lines.split(/\s+·\s+/).map(l => l.trim()).filter(Boolean) : [];
+  const strip = by.voice ? `<div class="lc-voice">
+      ${v.speaks ? `<div><b>${localize("Lens.Speaks")}</b> ${md(v.speaks)}</div>` : ""}
+      ${v.moves ? `<div><b>${localize("Lens.Moves")}</b> ${md(v.moves)}</div>` : ""}
+      ${v.tell ? `<div class="lc-tell"><b>${localize("Lens.Tell")}</b> ${md(v.tell)}</div>` : ""}
+      ${lines.length ? `<ul class="lc-lines">${lines.map(l => `<li>${md(l)}</li>`).join("")}</ul>` : ""}
+      ${!(v.speaks || v.moves || v.tell || lines.length) ? `<div class="codex-page">${block(by.voice.body, c.page)}</div>` : ""}
+    </div>` : "";
+  const w = wfhOf(by.wfh?.body);
+  const wfh = by.wfh ? (w.want || w.fear || w.hide ? `<div class="lens-wft lc-wfh">
+      ${w.want ? `<div><b>${localize("Lens.Want")}</b> ${md(w.want)}</div>` : ""}${w.fear ? `<div><b>${localize("Lens.Fear")}</b> ${md(w.fear)}</div>` : ""}${w.hide ? `<div><b>${localize("Lens.Hide")}</b> ${md(w.hide)}</div>` : ""}
+    </div>` : fold(c, by.wfh)) : "";
+
+  // How they were played (npcs.md): the as-played entry wins where it differs.
+  const played = c.played ? `<details class="pr-fold lc-sec lc-played" open><summary>${localize("Lens.AsPlayed")}</summary><div class="lc-body">
+      ${c.played.person.fields.map(f => `<div class="lens-field lens-${f.kind}"><span class="lens-label">${esc(f.label)}</span> ${md(f.value)}</div>`).join("")}
+      <div class="lens-acts"><button type="button" class="lens-btn" data-lens="open" data-uuid="${esc(c.played.page.uuid)}" data-line="${c.played.person.line}"><i class="fa-solid fa-scroll"></i> ${esc(c.played.page.parent.name)}</button></div></div></details>` : "";
+
+  return `<section class="lens-card lens-cardnote lens-npccard">
+      ${cardHead(c, "fa-solid fa-user", att)}
+      <div class="lc-buttons">${buttons}</div>
+      ${by.who ? `<div class="lc-glance codex-page lens-deco" data-source="${esc(c.page.uuid)}">${block(by.who.body, c.page)}</div>` : ""}
+      ${strip}${wfh}
+      ${fold(c, by.whispers)}${fold(c, by.look, { open: false })}${fold(c, by.attitude, { open: false })}${fold(c, by.knows)}
+      ${fold(c, by.secrets, { open: false, cls: "lc-secret" })}${fold(c, by.where, { open: false })}${fold(c, by.combat, { open: false })}
+      ${played}${others(c, ["who", "look", "voice", "wfh", "whispers", "attitude", "knows", "secrets", "where", "combat"])}
+      ${sources(c)}${c.book.length ? `<div class="lc-books">${cites(c)}</div>` : ""}
+    </section>`;
 }
 
 const section = (cls, icon, title, inner, count = null) => (inner ? `<section class="lens-card ${cls}">
@@ -92,17 +212,19 @@ function people(data) {
 
 function place(data) {
   const rows = [];
-  if ( data.place ) {
+  // A place card already has the Atlas and Theater buttons: here only what it doesn't (NPC cards, shops).
+  const carded = data.placeCards.length > 0;
+  if ( data.place && !carded ) {
     const p = data.place;
     rows.push(`<div class="lens-row"><i class="fa-solid fa-location-dot"></i> <b>${esc(p.name)}</b> <span class="lens-status lens-st-${esc(p.status ?? "")}">${esc(word("PlaceStatus", p.status ?? ""))}</span>
       <span class="lens-acts"><button type="button" class="lens-btn" data-lens="atlas-card" data-q="${esc(p.name)}">${localize("Lens.AtlasCard")}</button>
       <button type="button" class="lens-btn" data-lens="atlas-move" data-q="${esc(p.name)}"><i class="fa-solid fa-person-walking-arrow-right"></i> ${localize("Lens.AtlasMove")}</button></span></div>`);
   }
-  for ( const t of data.stage ) {
+  for ( const t of carded ? [] : data.stage ) {
     rows.push(`<div class="lens-row"><i class="fa-solid fa-masks-theater"></i> ${esc(t.label)}${t.title ? ` <span class="lens-alias">«${esc(t.title)}»</span>` : ""}
       <span class="lens-acts"><button type="button" class="lens-btn" data-lens="stage" data-label="${esc(t.label)}" data-scene="${esc(t.scene)}">${localize("Lens.Show")}</button></span></div>`);
   }
-  if ( data.stage.length ) rows.push(`<div class="lens-row lens-off"><button type="button" class="lens-btn" data-lens="stage-off"><i class="fa-solid fa-eye-slash"></i> ${localize("Lens.BackToMap")}</button></div>`);
+  if ( data.stage.length && !carded ) rows.push(`<div class="lens-row lens-off"><button type="button" class="lens-btn" data-lens="stage-off"><i class="fa-solid fa-eye-slash"></i> ${localize("Lens.BackToMap")}</button></div>`);
   for ( const t of data.cards ) {
     if ( data.people.length && data.people.some(({ person }) => [person.name, ...person.aliases].some(n => String(t.label).toLowerCase().includes(stripMd(n).toLowerCase()))) ) continue;
     rows.push(`<div class="lens-row"><i class="fa-solid fa-user"></i> ${esc(t.label)}
@@ -196,6 +318,23 @@ export async function onLensClick(target, panel, jumpTo) {
     case "stage-off": return busy(() => theater?.hide?.());
     case "card": return busy(() => theater?.showNpc?.(d.label, { scene: d.scene }));
     case "shop": return store?.console?.({ shopId: d.id });
+    case "actor": {
+      const actor = await fromUuid(d.uuid);
+      return actor?.sheet?.render(true);
+    }
+    case "event-roll": {
+      // Roll the place's table: the row lights up here, the roll goes to the GM's chat.
+      const die = Number(d.die) || 6;
+      const roll = await new foundry.dice.Roll(`1d${die}`).evaluate();
+      const box = target.closest(".lc-events");
+      const rows = Array.from(box?.querySelectorAll("tr[data-row]") ?? []);
+      const i = eventRow({ rows: rows.map(r => ({ n: r.dataset.n })) }, roll.total);
+      rows.forEach((r, n) => r.classList.toggle("lc-rolled", n === i));
+      if ( box ) box.open = true;
+      rows[i]?.scrollIntoView({ block: "nearest" });
+      await roll.toMessage({ flavor: localize("Lens.EventRolled", { place: d.place ?? "" }) }, { rollMode: CONST.DICE_ROLL_MODES.PRIVATE });
+      return null;
+    }
   }
   return null;
 }

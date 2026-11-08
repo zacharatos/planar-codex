@@ -5,7 +5,7 @@
  * parsed once per version of their Markdown. The other Planar modules are asked through their APIs, when active.
  */
 import { MODULE_ID, getMarkdown, isCodexPage } from "../codex.mjs";
-import { CITATION_RE } from "../markdown.mjs";
+import { CITATION_RE, splitFrontmatter, fmList } from "../markdown.mjs";
 import { linkIndex } from "../link-index.mjs";
 import { sheetPage, readSheet, run } from "../prompter/state.mjs";
 import * as L from "./core.mjs";
@@ -35,7 +35,7 @@ const tagsOf = page => (meta(page).tags ?? []).map(t => String(t).toLowerCase().
 
 /** Codex notes by kind. Rebuilt when the journal changes (cheap: flags only). */
 function notesBy() {
-  const out = { people: [], peopleTagged: [], ledger: [], glossary: [], prep: [], session: [] };
+  const out = { people: [], peopleTagged: [], ledger: [], glossary: [], prep: [], session: [], places: [], npcs: [] };
   for ( const entry of game.journal ) {
     for ( const page of entry.pages ) {
       if ( !isCodexPage(page) ) continue;
@@ -45,6 +45,8 @@ function notesBy() {
       // Other notes with people in them (a chapter prep's NPC voice notes, a homebrew NPC): tag `people`.
       else if ( tags.includes("people") ) out.peopleTagged.push(page);
       if ( type === "ledger" ) out.ledger.push(page);
+      if ( type === "place" ) out.places.push(page);
+      if ( type === "npc" ) out.npcs.push(page);
       if ( type === "glossary" || tags.includes("glossary") ) out.glossary.push(page);
       if ( type === "prep" ) out.prep.push(page);
       if ( type === "session" || tags.includes("session") ) out.session.push(page);
@@ -62,10 +64,51 @@ const taggedPeopleOf = page => cached(page, "peopleTagged", md => L.parsePeople(
 const ledgerOf = page => cached(page, "ledger", md => L.parseLedger(md));
 const glossaryOf = page => cached(page, "glossary", md => L.parseGlossary(md));
 
+/**
+ * A place or NPC note as a card, with the frontmatter fields the card uses (key, theater, scape, atlas, actor, book)
+ * and every name it answers to.
+ */
+export function cardOf(page, kind) {
+  return cached(page, `card-${kind}`, md => {
+    const card = L.parseCard(md, kind);
+    const data = splitFrontmatter(md).data ?? {};
+    const list = k => fmList(data, k).map(String).filter(Boolean);
+    const theater = data.theater && typeof data.theater === "object" && !Array.isArray(data.theater) ? Object.values(data.theater).map(String) : list("theater");
+    const names = [...new Set([page.parent?.name, card.name, ...card.aliases, ...list("aliases"), data.key ? String(data.key).replace(/-/g, " ") : null].filter(Boolean).map(n => L.stripMd(n)))];
+    return { kind, page, card, key: data.key ? String(data.key) : null, theater, scape: list("scape"), atlas: data.atlas ? String(data.atlas) : null,
+      actor: data.actor ? String(data.actor) : null, book: list("book"), tags: list("tags"), names };
+  });
+}
+
+/** The card notes that a set of names (and the raw query, for a Theater label) is about. */
+function cardsFor(pages, kind, variants, query, { inQuery = false } = {}) {
+  const q = ` ${L.fold(query)} `;
+  const out = [];
+  for ( const page of pages ) {
+    const c = cardOf(page, kind);
+    const own = c.names.flatMap(L.nameVariants);
+    const direct = own.some(v => variants.includes(v)) || c.theater.some(t => L.fold(t) === L.fold(query));
+    // "Ch02 - 04 - The Ubiquitous Wayfarer + Riaen Blackhome": the place is named inside the label.
+    const named = inQuery && c.names.some(n => { const f = L.fold(n); return f.length >= 5 && q.includes(` ${f} `); });
+    if ( direct || named ) out.push({ ...c, direct });
+  }
+  return out.sort((a, b) => b.direct - a.direct);
+}
+
+/** The NPC note for a name (a link target in a place's "who is here"), or null. */
+export function npcCardNamed(name) {
+  const v = L.nameVariants(name);
+  for ( const page of notesBy().npcs ) {
+    const c = cardOf(page, "npc");
+    if ( c.names.flatMap(L.nameVariants).some(x => v.includes(x)) ) return c;
+  }
+  return null;
+}
+
 /** The name book: glossary rows and people's names. Rebuilt when one of its notes changes. */
 let book = { key: "", value: null };
 function nameBook(notes) {
-  const pages = [...notes.glossary, ...notes.people, ...notes.peopleTagged];
+  const pages = [...notes.glossary, ...notes.people, ...notes.peopleTagged, ...notes.places, ...notes.npcs];
   const key = pages.map(p => `${p.uuid}:${getMarkdown(p).length}:${p._stats?.modifiedTime ?? ""}`).join("|");
   if ( book.key === key && book.value ) return book.value;
   const groups = [
@@ -73,6 +116,11 @@ function nameBook(notes) {
     ...notes.people.flatMap(peopleOf).map(p => [p.name, ...p.aliases]),
     ...notes.peopleTagged.flatMap(taggedPeopleOf).map(p => [p.name, ...p.aliases])
   ];
+  // Place and NPC notes, by name and aliases.
+  for ( const page of [...notes.places, ...notes.npcs] ) {
+    const c = cardOf(page, notes.places.includes(page) ? "place" : "npc");
+    groups.push(c.names);
+  }
   // Notes named for a thing, with their aliases (a note "Farrow - Echo of the Wheel" with aliases [Farrow]).
   for ( const e of linkIndex.index.entries ) if ( e.aliases?.length ) groups.push([e.name, ...e.aliases]);
   book = { key, value: new L.NameBook(groups) };
@@ -134,17 +182,32 @@ export function gather(query) {
   const named = n => L.nameVariants(n).some(v => variants.includes(v));
   const out = { query, names, variants };
 
+  // Place and NPC cards (0.8): the notes written for this place or person come first.
+  out.placeCards = cardsFor(notes.places, "place", variants, query, { inQuery: true }).slice(0, 2);
+  out.npcCards = cardsFor(notes.npcs, "npc", variants, query).slice(0, 3);
+  // A place card lists who is there: their NPC notes, for the chips.
+  for ( const p of out.placeCards ) {
+    p.who = L.linkTargets(p.card.by.who?.body).map(t => npcCardNamed(t)).filter(Boolean);
+  }
+
   // People: entries whose name or aliases are one of the names.
   // The NPC notes first (as played), then the tagged notes (as prepared, newest first): one card per person.
   const matching = (pages, parse) => pages.map(page => parse(page).filter(p => L.personVariants(p).some(v => variants.includes(v))).map(person => ({ person, page })));
   const tagged = [...notes.peopleTagged].sort((a, b) => b.parent.name.localeCompare(a.parent.name, undefined, { numeric: true }));
   out.people = L.mergeAcross([...matching(notes.people, peopleOf), ...matching(tagged, taggedPeopleOf)]);
   out.people.forEach(p => { p.prepared = !notes.people.includes(p.page); });
+  // Someone with an NPC note: the card shows them, with how they were played (npcs.md) inside it.
+  for ( const c of out.npcCards ) {
+    const own = c.names.flatMap(L.nameVariants);
+    c.played = out.people.find(({ person, prepared }) => !prepared && L.personVariants(person).some(v => own.includes(v))) ?? null;
+  }
+  out.people = out.people.filter(p => !out.npcCards.some(c => c.played === p || L.personVariants(p.person).some(v => c.names.flatMap(L.nameVariants).includes(v))));
 
   // Notes named for it (by note name or alias), other than the people notes.
   const notePages = [];
+  const cardPages = new Set([...out.placeCards, ...out.npcCards].map(c => c.page));
   for ( const e of linkIndex.index.entries ) {
-    if ( notes.people.includes(e.page) ) continue;
+    if ( notes.people.includes(e.page) || cardPages.has(e.page) ) continue;
     if ( [e.name, ...(e.aliases ?? [])].some(named) ) notePages.push(e.page);
   }
   out.notes = notePages.slice(0, 6);
@@ -208,7 +271,7 @@ export function gather(query) {
   for ( const { row } of out.threads ) addCites(row.payoff);
   out.cites = cites.slice(0, 6);
 
-  out.empty = !(out.people.length || out.notes.length || out.place || out.stage.length || out.cards.length || out.shops.length
+  out.empty = !(out.placeCards.length || out.npcCards.length || out.people.length || out.notes.length || out.place || out.stage.length || out.cards.length || out.shops.length
     || out.contacts.length || out.favours.length || out.beats.length || out.tonight.length || out.threads.length || out.prep.length || out.sessions.length);
   return out;
 }

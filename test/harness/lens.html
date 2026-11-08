@@ -47,7 +47,9 @@
     close() { this.element?.remove(); this.element = null; this.rendered = false; this._onClose?.({}); }
   }
   const DialogV2 = { prompt: async () => window.dialogAnswer ?? null };
+  window.CONST = { DICE_ROLL_MODES: { PRIVATE: "gmroll" } };
   window.foundry = {
+    dice: { Roll: class { constructor(f) { this.f = f; } async evaluate() { this.total = 1 + Math.floor(Math.random() * Number(this.f.split("d")[1])); return this; } async toMessage(d) { console.log("ROLL", this.f, this.total, d.flavor); } } },
     applications: { api: { ApplicationV2, DialogV2 }, ux: { TextEditor: { implementation: { enrichHTML: async h => h.replace(/\[\[\/check ([^\]]+)\]\]/g, '<a class="roll-link"><i class="fa-solid fa-dice-d20"></i> $1</a>') } } } },
     utils: { deepClone: clone, randomID: () => Math.random().toString(36).slice(2, 10), getProperty: (o, k) => k.split(".").reduce((a, b) => a?.[b], o), hasProperty: (o, k) => k.split(".").reduce((a, b) => a?.[b], o) !== undefined },
     audio: { AudioHelper: { play() {} } }
@@ -68,7 +70,8 @@
     mkPage("names", "names", await read("glossary.md"), { type: "reference", tags: ["glossary"] }),
     mkPage("ch3", "Chapter 03 - The Deed", await read("chapter.md"), { type: "prep" }),
     mkPage("s06", "2026-10-01 - Session 06 - The archivist", await read("session.md"), { type: "session" }),
-    mkPage("lib", "The Old Library", "# The Old Library\n\nA note about the place.", { type: "place", aliases: ["η Παλιά Βιβλιοθήκη"] })
+    mkPage("lib", "The Old Library", await read("place.md"), { type: "place", aliases: ["The Old Library", "η Παλιά Βιβλιοθήκη", "Παλιά Βιβλιοθήκη"], tags: ["place"] }),
+    mkPage("marina", "Marina Kollia", await read("npc.md"), { type: "npc", aliases: ["Marina Kollia", "Μαρίνα", "η Μαρίνα"], tags: ["npc"] })
   ];
   const byUuid = new Map(pages.map(p => [p.uuid, p]));
   const users = [{ id: "gm", name: "GM", isGM: true, active: true }, { id: "u1", name: "Anna", isGM: false, active: true }, { id: "u2", name: "Bob", isGM: false, active: true }];

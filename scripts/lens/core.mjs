@@ -488,8 +488,11 @@ export function mentionsIn(markdown, variants, max = 5) {
     const body = ` ${fold(own.join("\n"))} `;
     const count = variants.reduce((n, v) => n + (v ? body.split(` ${v} `).length - 1 : 0), 0);
     if ( !inHeading && !count ) return;
+    // A list or a table (a session's live log): the lines that name it, not the whole section run together.
+    const named = own.filter(l => /^\s*(?:[-*+]\s|\d+[.)]\s|\|)/.test(l) && mentions(fold(l), variants)).map(plainLine).map(l => l.trim()).filter(Boolean);
+    const text = named.length ? named.slice(0, 2).join(" · ") : plainText(own.join("\n"));
     hits.push({ heading: sec.text, level: sec.level, line: sec.line, count, inHeading, order,
-      excerpt: excerpt(plainText(own.join("\n")) || sec.text, variants, 150) });
+      excerpt: excerpt(text || sec.text, variants, 150) });
   });
   return hits.sort((a, b) => (b.inHeading - a.inHeading) || (b.count - a.count) || (a.order - b.order)).slice(0, max);
 }
@@ -516,6 +519,145 @@ export function citationsIn(text, citationRe) {
   for ( const m of String(text ?? "").matchAll(/`([^`\n]+)`/g) ) {
     const t = m[1].trim();
     if ( citationRe.test(t) && !out.includes(t) ) out.push(t);
+  }
+  return out;
+}
+
+/* -------------------------------------------- */
+/*  Place and NPC cards (0.8)                   */
+/* -------------------------------------------- */
+
+/**
+ * The fixed headings of a place note (`type: place`) and an NPC note (`type: npc`), Greek or English.
+ * Every section is optional; anything else is shown after them under its own heading.
+ */
+export const PLACE_SECTIONS = {
+  glance: ["Με μια ματιά", "At a glance", "Overview"],
+  where: ["Πού είναι", "Where it is", "Where", "Location"],
+  readaloud: ["Ανάγνωση", "Read-aloud", "Read aloud", "Readaloud"],
+  senses: ["Αισθήσεις", "Senses"],
+  view: ["Η ματιά από εδώ", "The view from here", "Point of view", "View"],
+  who: ["Ποιοι είναι εδώ", "Ποιος είναι εδώ", "Who is here", "Who's here", "People here"],
+  events: ["Τι μπορεί να συμβεί", "What can happen", "Events", "Random events"],
+  secrets: ["Μυστικά και στοιχεία", "Μυστικά", "Secrets and clues", "Secrets", "Clues"],
+  prices: ["Τιμές και υπηρεσίες", "Τιμές", "Prices and services", "Prices", "Services"],
+  whispers: ["Ψίθυροι", "Whispers", "Private lines"],
+  remember: ["Θυμήσου", "Remember", "Notes"]
+};
+export const NPC_SECTIONS = {
+  who: ["Ποια είναι", "Ποιος είναι", "Ποιοι είναι", "Who she is", "Who he is", "Who they are", "Who"],
+  look: ["Εμφάνιση", "Appearance", "Looks", "Look"],
+  voice: ["Φωνή και τρόπος", "Φωνή", "Voice and manner", "Voice", "Roleplay", "Roleplaying"],
+  wfh: ["Θέλει · Φοβάται · Κρύβει", "Θέλει, φοβάται, κρύβει", "Wants · Fears · Hides", "Want / Fear / Hide", "Wants, fears, hides", "Motives"],
+  attitude: ["Στάση απέναντι στην ομάδα", "Στάση", "Attitude to the party", "Attitude"],
+  knows: ["Τι ξέρει", "What she knows", "What he knows", "What they know", "Knowledge", "Knows"],
+  secrets: ["Μυστικά", "Secrets"],
+  where: ["Πού θα τη βρουν", "Πού θα τον βρουν", "Πού θα τους βρουν", "Πού θα το βρουν", "Where to find her", "Where to find him", "Where to find them", "Where to find"],
+  combat: ["Μάχη", "Combat", "In a fight"],
+  whispers: ["Ψίθυροι", "Whispers", "Private lines"]
+};
+
+const foldedSections = table => Object.fromEntries(Object.entries(table).map(([id, names]) => [id, names.map(n => fold(n))]));
+const PLACE_FOLDED = foldedSections(PLACE_SECTIONS);
+const NPC_FOLDED = foldedSections(NPC_SECTIONS);
+
+/** Which known section a heading is, or null. */
+export function sectionId(heading, kind) {
+  const f = fold(stripMd(heading));
+  for ( const [id, names] of Object.entries(kind === "npc" ? NPC_FOLDED : PLACE_FOLDED) ) if ( names.includes(f) ) return id;
+  return null;
+}
+
+/**
+ * A place or NPC note as a card.
+ * @param {string} markdown
+ * @param {"place"|"npc"} kind
+ * @returns {{title: string, name: string, aliases: string[], about: string, intro: string, sections: {id: string|null,
+ *   heading: string, body: string, line: number}[], by: Record<string, {heading, body, line}>}}
+ */
+export function parseCard(markdown, kind = "place") {
+  const secs = sectionsOf(markdown);
+  const h1 = secs.find(s => s.level === 1);
+  const titleText = h1 ? h1.raw : "";
+  const t = parsePersonTitle(titleText);
+  // Text between the title and the first sub-heading (the note's DM box: sources, links).
+  let intro = "";
+  if ( h1 ) {
+    const own = [];
+    for ( const line of h1.body.split("\n") ) { if ( /^#{1,6}\s/.test(line) ) break; own.push(line); }
+    intro = own.join("\n").trim();
+  }
+  const level = Math.min(...secs.filter(s => s.level >= 2).map(s => s.level), 2);
+  const sections = secs.filter(s => s.level === level && s !== h1).map(s => ({ id: sectionId(s.text, kind), heading: s.text, body: s.body.trim(), line: s.line }));
+  const by = {};
+  for ( const s of sections ) if ( s.id && !(s.id in by) ) by[s.id] = s;
+  return { title: stripMd(titleText), name: t.name, aliases: t.aliases, about: t.about, intro, sections, by };
+}
+
+/**
+ * `- **Label:** value` bullets of a section, by label (folded): the voice strip (Μιλάει / Κινείται / Σημάδι / Ατάκες)
+ * and want · fear · hide (Θέλει / Φοβάται / Κρύβει).
+ * @returns {{label: string, value: string}[]}
+ */
+export function labelledBullets(body) {
+  const out = [];
+  for ( const line of String(body ?? "").split("\n") ) {
+    const m = line.match(/^\s*[-*+]\s+\*\*([^*]+?):?\*\*:?\s*(.*)$/);
+    if ( m ) out.push({ label: m[1].trim().replace(/:$/, ""), value: m[2].trim() });
+    else if ( out.length && /^\s{2,}\S/.test(line) ) out[out.length - 1].value += ` ${line.trim()}`;
+  }
+  return out;
+}
+
+const VOICE_KEYS = {
+  speaks: ["μιλαει", "speaks", "speech", "voice"],
+  moves: ["κινειται", "moves", "body", "manner"],
+  tell: ["σημαδι", "tell", "the tell"],
+  lines: ["ατακεσ", "lines", "quotes", "says"]
+};
+const WFH_KEYS = { want: ["θελει", "wants", "want"], fear: ["φοβαται", "fears", "fear"], hide: ["κρυβει", "hides", "hide", "secret"] };
+
+function pick(bullets, keys) {
+  const out = {};
+  for ( const b of bullets ) {
+    const f = fold(b.label);
+    for ( const [k, names] of Object.entries(keys) ) if ( !(k in out) && names.includes(f) ) out[k] = b.value;
+  }
+  return out;
+}
+/** The roleplay strip of an NPC note: {speaks, moves, tell, lines} (Markdown, any may be missing). */
+export const voiceOf = body => pick(labelledBullets(body), VOICE_KEYS);
+/** Want · fear · hide of an NPC note: {want, fear, hide}. */
+export const wfhOf = body => pick(labelledBullets(body), WFH_KEYS);
+
+/**
+ * The events table of a place: its die (from the first header cell, "d6") and its rows.
+ * @returns {{die: number, rows: {n: string, text: string, when: string}[]}|null}
+ */
+export function eventsOf(body) {
+  const table = tablesOf(body)[0];
+  if ( !table ) return null;
+  const m = String(table.header[0] ?? "").match(/d\s*(\d+)/i);
+  const rows = table.rows.map(r => ({ n: stripMd(r.cells[0] ?? ""), text: r.cells[1] ?? "", when: r.cells[2] ?? "" })).filter(r => r.text);
+  if ( !rows.length ) return null;
+  return { die: m ? Number(m[1]) : rows.length, rows };
+}
+
+/** Which row a roll lands on: a row whose first cell is the number or a range ("2-3", "5–6"), else the n-th row. */
+export function eventRow(events, roll) {
+  const i = events.rows.findIndex(r => {
+    const m = r.n.match(/^(\d+)(?:\s*[-–]\s*(\d+))?$/);
+    return m && roll >= Number(m[1]) && roll <= Number(m[2] ?? m[1]);
+  });
+  return i >= 0 ? i : (roll - 1 < events.rows.length ? roll - 1 : -1);
+}
+
+/** Wiki-link targets in a section ("[[Riaen Blackhome|Ράιεν]]" → "Riaen Blackhome"). */
+export function linkTargets(body) {
+  const out = [];
+  for ( const m of String(body ?? "").matchAll(/(?<!!)\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]/g) ) {
+    const t = m[1].trim();
+    if ( t && !out.includes(t) && !/^(npcs|monster:|actor:|item:|spell:)/i.test(t) ) out.push(t);
   }
   return out;
 }

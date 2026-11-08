@@ -37,7 +37,7 @@ scripts/
     core.mjs             pure: sections, tables, people / ledger / glossary parsing, name variants and the NameBook, mentions (unit-tested)
     data.mjs             gathers what notes (by frontmatter type) and the other Planar modules know about a name; parses once per Markdown version
     index.mjs            the Lens target, following the table (Prompter contexts, selected NPC tokens), settings
-    view.mjs             the Lens tab's HTML and clicks (rendered inside the Prompter panel, prompter/panel.mjs)
+    view.mjs             the Lens tab's HTML and clicks (rendered inside the Prompter panel, prompter/panel.mjs), the place and NPC cards (0.8)
   library/
     core.mjs             pure: book index, citations, finding a section, section Markdown, search, batching (unit-tested)
     store.mjs            the GM-only world compendium: reading a books folder, importing, loading books (cached)
@@ -190,6 +190,10 @@ Lens (harness first: `npm run harness`, then /test/harness/lens.html?q=Marina, o
 - Typing in the Lens box survives the console redrawing (a Theater fade, a note added).
 - A person only in a note tagged `people` shows *not met yet* and opens that note; one also in the NPC note shows once, with an *also* button per other note.
 - Without Theater, Atlas, Factions or Store active: their parts are simply missing, nothing errors.
+- **Place card (0.8)** (harness: ?q=The%20Old%20Library; at the table: the Wayfarer, the Black Hood, the Hall of Records): it comes first, with the Greek name, the English one, its tags; Theater buttons show each image and the 🙈 one takes it down; ♪ plays the scape; *Move the party* moves the Atlas party; the read-aloud has Show / Chat; the people in *Ποιοι είναι εδώ* with a note are chips (hover: want and fear; click: their card); 🎲 d6 lights one row and posts the roll to your chat only; secrets are folded with a 🔒; fold a section, add a note in the Prompter tab, come back: it stays folded. The old *The place* box no longer repeats the Atlas and Theater rows.
+- Showing a chapter image on Theater (`Ch02 - 04 - The Ubiquitous Wayfarer + Riaen Blackhome`) brings the Wayfarer's card up, not just the image's name.
+- **NPC card (0.8)** (harness: ?q=Marina; at the table: Parisa, Riaen, the Taker): *Ποια είναι*, then the roleplay strip (speaks, moves, tell, the lines as a list), then wants / fears / hides; *Τι ξέρει* has working roll buttons; secrets folded; *NPC card* shows the Theater card, *Sheet* opens the actor when one has that name; the person's `npcs` entry shows inside the card (*As played*) and not again below.
+- `game.modules.get("planar-codex").api.placeCard("Wayfarer")` returns the parsed card; `api.openPlace("Wayfarer")` opens the Lens on it; `api.lens.cards("Parisa")` lists the cards for a name.
 
 Library
 - Journal sidebar → Library → Import books: choose the books folder; the codes come from the index note's table; big books start unticked; import. A compendium "Library (Planar Codex)" appears, GM only (a player can't see or open it). Importing a book again replaces it.

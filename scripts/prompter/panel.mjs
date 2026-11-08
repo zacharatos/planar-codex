@@ -436,6 +436,8 @@ export class PrompterPanel extends ApplicationV2 {
     const title = root.querySelector(".window-title");
     if ( title && title.textContent !== this.title ) title.textContent = this.title;
     if ( this.tab === "prompter" ) await this.#fillBodies();
+    // Place and NPC cards in the Lens: read-alouds get Show / Post, private lines get Whisper.
+    else for ( const el of root.querySelectorAll(".lens-deco") ) decorateCallouts(el, { source: el.dataset.source ?? "" });
   }
 
   #tick() {

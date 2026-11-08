@@ -221,3 +221,41 @@ test("want, fear and tell in three columns become one field", () => {
   const [p] = L.parsePeople(md, "prep", { requireWft: true });
   assert.deepEqual(p.fields, [{ label: "Want / Fear / Tell", value: "a blade / the guild / taps twice", kind: "wft" }]);
 });
+
+/* ---- 0.8: place and NPC cards ---- */
+
+test("parseCard: a place note's fixed sections, Greek or English, and the rest", async () => {
+  const L = await import("../scripts/lens/core.mjs");
+  const md = "---\ntype: place\n---\n# Η Παλιά Βιβλιοθήκη (The Old Library; archive)\n\n> [!dm] Box\n> links\n\n## Με μια ματιά\n- cold\n\n## Read-aloud\n> [!readaloud] In\n> dust\n\n## Τι μπορεί να συμβεί\n| d6 | Γεγονός | Πότε |\n|---|---|---|\n| 1-2 | A | day |\n| 3 | B | night |\n\n## Ποιοι είναι εδώ\n- [[Marina Kollia|Μαρίνα]] and [[npcs]]\n\n## Odd one\n- x";
+  const c = L.parseCard(md, "place");
+  assert.equal(c.name, "Η Παλιά Βιβλιοθήκη");
+  assert.deepEqual(c.aliases, ["The Old Library"]);
+  assert.equal(c.about, "archive");
+  assert.match(c.intro, /\[!dm\] Box/);
+  assert.deepEqual(c.sections.map(s => s.id), ["glance", "readaloud", "events", "who", null]);
+  assert.equal(c.by.glance.body, "- cold");
+  const ev = L.eventsOf(c.by.events.body);
+  assert.equal(ev.die, 6);
+  assert.equal(L.eventRow(ev, 2), 0);
+  assert.equal(L.eventRow(ev, 3), 1);
+  assert.equal(L.eventRow(ev, 5), -1);
+  assert.deepEqual(L.linkTargets(c.by.who.body), ["Marina Kollia"]);
+});
+
+test("parseCard: an NPC's voice strip and want · fear · hide", async () => {
+  const L = await import("../scripts/lens/core.mjs");
+  const md = "# Μαρίνα (Marina; archivist)\n\n## Φωνή και τρόπος\n- **Μιλάει:** dry\n- **Κινείται:** tidies\n- **Σημάδι:** stops\n  tidying\n- **Ατάκες:** «Α» · «Β»\n\n## Wants · Fears · Hides\n- **Wants:** order\n- **Φοβάται:** fire\n- **Κρύβει:** a copy";
+  const c = L.parseCard(md, "npc");
+  assert.deepEqual(c.sections.map(s => s.id), ["voice", "wfh"]);
+  assert.deepEqual(L.voiceOf(c.by.voice.body), { speaks: "dry", moves: "tidies", tell: "stops tidying", lines: "«Α» · «Β»" });
+  assert.deepEqual(L.wfhOf(c.by.wfh.body), { want: "order", fear: "fire", hide: "a copy" });
+  assert.equal(L.sectionId("Πού θα τον βρουν", "npc"), "where");
+  assert.equal(L.sectionId("Μυστικά και στοιχεία", "place"), "secrets");
+});
+
+test("mentionsIn: a live log's list shows the lines that name it, not the section run together", async () => {
+  const L = await import("../scripts/lens/core.mjs");
+  const md = "## What the modules saw\n\n- 00:23 **Theater** A Market Ward street\n- 00:40 **Time** Day 1 · 14:25\n- 00:41 **Atlas** → the Great Bazaar\n- 01:02 **Theater** A Market Ward street";
+  const [hit] = L.mentionsIn(md, L.nameVariants("A Market Ward street"));
+  assert.equal(hit.excerpt, "00:23 Theater A Market Ward street · 01:02 Theater A Market Ward street");
+});

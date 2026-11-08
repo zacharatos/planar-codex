@@ -92,6 +92,7 @@ The GM console (the Prompter's window) has a second tab, the **Lens** (Φακό�
 
 - **It follows the table:** a Planar Theater place or NPC card shown, a Planar Atlas stop, the scene that becomes active, an NPC token you select. Or type any name, in any language your notes use. **📌** pins it.
 - **It shows**, most useful first:
+  - **The place card and the person card** (0.8), when you keep a note for that place (`type: place`) or person (`type: npc`): one card built from the note's sections, below.
   - **People:** an NPC's *want / fear / tell*, voice, attitude, what they know and their status, plus their faction standing (Planar Factions).
   - **The place:** its Atlas card and *Move the party*, its Theater images with *Show* and *Back to the map*, and the shops there (Planar Store).
   - **Debts and favours** that involve it.
@@ -115,7 +116,12 @@ The GM console (the Prompter's window) has a second tab, the **Lens** (Φακό�
   - `type: prep` and `type: session` notes: searched for mentions (run sheets without their beat boxes; the deck lists those).
   - Notes tagged `glossary`: two-column tables pairing names (*English | Ελληνικά*). Every row makes both names find the same things.
   - Note names and `aliases` work the same way.
-- **Check your notes:** `node tools/ready-check.mjs "<vault>"` (from a clone of this repo) lists what keeps a note from working with the Prompter and the Lens: a missing `type`, people without *want / fear / tell*, beat triggers that match nothing at the table.
+  - `type: place` and `type: npc` notes (0.8): **one note per place or important person**, shown as a card. Fixed section headings, Greek or English; each optional, the card shows what's there, in this order:
+    - **Place:** *Με μια ματιά* (at a glance, always shown) · *Ανάγνωση* (read-alouds, with Show / Chat) · *Αισθήσεις* · *Η ματιά από εδώ* · *Ποιοι είναι εδώ* (a chip per person with a note: want and fear on hover, click for their card) · *Τι μπορεί να συμβεί* (a `| d6 | … | … |` table with a 🎲 button: the roll goes to your chat only, the row lights up) · *Μυστικά και στοιχεία* (folded, 🔒) · *Ψίθυροι* (private lines, with Whisper) · *Πού είναι* · *Τιμές και υπηρεσίες* · *Θυμήσου*. Buttons on top: its Theater images (frontmatter `theater:` and Theater's own labels), its soundscape (`scape:`), *Move the party* (the Atlas place, or `atlas:`), *Open the note*.
+    - **Person:** *Ποια είναι* (always shown) · the **roleplay strip** from *Φωνή και τρόπος* bullets (`**Μιλάει:**`, `**Κινείται:**`, `**Σημάδι:**`, `**Ατάκες:**` «…» · «…») · *Θέλει · Φοβάται · Κρύβει* (`**Θέλει:**`, `**Φοβάται:**`, `**Κρύβει:**`) · *Ψίθυροι* (private lines, with Whisper) · *Εμφάνιση* · *Στάση απέναντι στην ομάδα* · *Τι ξέρει* (a table; rolls work) · *Μυστικά* (folded, 🔒) · *Πού θα τη βρουν* · *Μάχη* · and how they were played, from the `type: npcs` note. Buttons: *NPC card* (Theater), *Sheet* (the actor named in `actor:` or by their English name), *Open the note*.
+    - Other headings show at the end under their own name; the text between the title and the first heading (sources, links) folds into *Sources and links*. `book:` citations open the Library.
+    - The title is `# Greek name (English name; role)`; `key:` is the thing's stable id (`wayfarer`, `parisa`). API: `api.placeCard(name)`, `api.openPlace(name)`, `api.lens.cards(name)`.
+- **Check your notes:** `node tools/ready-check.mjs "<vault>"` (from a clone of this repo) lists what keeps a note from working with the Prompter and the Lens: a missing `type`, people without *want / fear / tell*, beat triggers that match nothing at the table, `@Place` / `@Cast` buttons and image embeds whose image isn't in the vault's `Visuals/WebP`. Add `--assets` for the list of images the notes use with their path on the server (`dnd/<path>`), and `--note "<path>"` to check one note, e.g. a run sheet before the session.
 - A first name finds the whole name ("Marina" finds "Marina Kollia") when nothing else is called just that.
 
 ## Library: the books, one click from any citation

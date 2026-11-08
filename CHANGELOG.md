@@ -3,6 +3,25 @@
 All notable changes to this module. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 The release workflow uses the section matching the tag as the GitHub release notes, so keep the `## [x.y.z]` headings exact.
 
+## [0.8.0]
+
+Codex "Cards", part 2: the place card and the person card in the Lens.
+
+### Added
+- **Place card.** A `type: place` note (one per place, in the vault) is the first thing the Lens shows for that place: its names and tags; buttons for its Theater images, its soundscape, *Move the party* and the note; *Με μια ματιά* always in sight; then the read-alouds (Show / Chat), senses, the view from here, who is here (a chip per person with a note: want and fear on hover, click for their card), what can happen (a d6 table with a 🎲 that lights the rolled row and posts the roll to the GM's chat only), secrets and clues (folded, 🔒), where it is, prices and services, things to remember, and any other section under its own heading. Showing a chapter image on Theater whose label names the place (e.g. `Ch02 - 04 - The Ubiquitous Wayfarer + Riaen Blackhome`) brings the card up.
+- **Person card.** A `type: npc` note: who she is, then the **roleplay strip** (how she speaks, moves, her tell, three lines ready to say), wants · fears · hides, looks, attitude, what she knows (a table with live rolls), secrets (folded, 🔒), where to find her, combat, and how she was played (her entry in the `type: npcs` note, shown inside the card rather than again below). Buttons: her Theater NPC card, her actor's sheet, the note.
+- Headings are fixed names, Greek or English (README); each section is optional. Both cards also take *Ψίθυροι* (private lines with their Whisper buttons, e.g. what two heroes notice when they first see someone).
+- API: `api.placeCard(name)` (the parsed card, for the Atlas arrival card), `api.openPlace(name)`, `api.lens.cards(name)`.
+
+### Changed
+- *In past sessions*: a live log's hit shows the lines that name the thing («00:23 Theater A Market Ward street»), not its whole section run together.
+- With a place card, the Lens's *The place* box no longer repeats the Atlas and Theater rows.
+
+### Ready check (`tools/ready-check.mjs`; not part of the installed module)
+- Place and NPC notes: no title is an error; no `key:`, a section the card doesn't know (a typo shows at the end of the card), and a voice or wants section without its bold labels are warnings.
+- `tools/ready-check.mjs` checks images: every `@Place[…]` and `@Cast[…]` button is looked up the way Theater does (exact name, then "starts with", then "contains", over the place images or the NPC cards in `Visuals/WebP`), and every `![[…]]` embed must have its WebP copy. An image that isn't there is an error; a button that matches several images by part of its name, an embedded original (.png/.jpg) and a `_work/` scratch image are warnings; a plain link to an image file is an error (Codex shows it as broken).
+- `--assets` lists every image the notes use with its path on the server (`Visuals/WebP/<path>` is `dnd/<path>` in Foundry's User Data), to check before a session that everything is uploaded. With `--json`, the output becomes `{notes, otherBooks, assets}`; without `--assets` it stays the list of notes as before.
+
 ## [0.7.1]
 
 From the first try of 0.7.0 at the table.

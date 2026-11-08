@@ -2,7 +2,10 @@
 /**
  * Ready check: are the vault's notes ready for the Prompter and the Lens?
  *
- *   node tools/ready-check.mjs <vault> [--note "Prep/Session 04 - run sheet.md"] [--json]
+ *   node tools/ready-check.mjs <vault> [--note "Prep/Session 04 - run sheet.md"] [--json] [--assets]
+ *
+ *   --assets  also list every image the notes use (@Place, @Cast, embeds) with its path on the server, so you can
+ *             check they are uploaded before the session (Visuals/WebP/<path> is dnd/<path> in Foundry's User Data)
  *
  * Reads the notes with the module's own parsers (scripts/prompter/core.mjs, scripts/lens/core.mjs,
  * scripts/library/core.mjs) and lists what won't work at the table:
@@ -13,6 +16,12 @@
  * What it knows about the table comes from the vault: the Atlas pack (Foundry/atlas/*-pack.json: the names stops are
  * recorded by), the Theater images (Visuals/WebP: the labels Theater reports), the heroes (Campaign/Players, type pc),
  * the ledger, the glossary, the book codes (Sources/INDEX.md).
+ *
+ * Images: Visuals/WebP is the copy of the images that goes to the Foundry server, uploaded with the same folders under
+ * User Data/dnd/. A Theater button (@Place, @Cast) finds its image by file name the way Theater does (exact name, then
+ * "starts with", then "contains"; a place's leading "NN - " doesn't count), so a button that finds nothing here won't
+ * find anything at the table either. (Whether the image is also added to a Theater scene on the server can't be
+ * checked from the vault.)
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -34,6 +43,11 @@ const KEYWORD_CONTEXTS = [
   { kind: "time", text: "evening" }, { kind: "time", text: "βράδυ" }
 ];
 const MAX_DECK = 8;
+/** Visuals/WebP/<path> in the vault is <SERVER_ROOT>/<path> in Foundry's User Data. */
+export const SERVER_ROOT = "dnd";
+const IMAGE = /\.(webp|png|jpe?g|gif|avif)$/i;
+/** Never uploaded: scratch work. */
+const NOT_UPLOADED = /(^|\/)_work(\/|$)/;
 const hasGreek = s => /[Ͱ-Ͽἀ-῿]/.test(s);
 const hasLatin = s => /[A-Za-z]/.test(s);
 
@@ -75,6 +89,14 @@ export function readTable(vault, notes) {
       for ( const p of pack.places ?? [] ) t.atlas.push({ id: p.id, el: p.name?.el ?? "", en: p.name?.en ?? "" });
     } catch(err) { /* a broken pack is the pack builder's business */ }
   }
+  // The WebP mirror: every image, by its path under Visuals/WebP (= its path under dnd/ on the server).
+  const webp = path.join(vault, "Visuals", "WebP");
+  t.assets = listFiles(webp, IMAGE).map(f => {
+    const rel = path.relative(webp, f).split(path.sep).join("/");
+    const label = assetLabel(rel);
+    const group = /(^|\/)NPCs\//.test(rel) ? "cast" : /^(Places|Scenes)\//.test(rel) ? "place" : "other";
+    return { rel, label, group, file: path.basename(rel), scratch: NOT_UPLOADED.test(rel) };
+  });
   // Theater: images are labelled by their file name.
   for ( const f of listFiles(path.join(vault, "Visuals", "WebP"), /\.(webp|png|jpe?g)$/i) ) {
     if ( /Characters[\\/]Players|Maps|Style/.test(f) ) continue;
@@ -111,6 +133,91 @@ function frontmatter(text) {
 }
 
 /* -------------------------------------------- */
+/*  Images                                      */
+/* -------------------------------------------- */
+
+/** Theater's label for an image: the file name without extension and a leading "NN - " (planar-theater labelFromPath). */
+export const assetLabel = rel => String(rel).split("/").pop().replace(/\.[^.]+$/, "").replace(/^\d+\s*[-_.]\s*/, "");
+/** Theater's name folding (planar-theater foldName). */
+const foldAsset = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, " ").trim();
+
+/** Blank out code (fenced blocks, inline spans) so examples aren't checked; line numbers stay. */
+const withoutCode = text => String(text).replace(/```[\s\S]*?```|~~~[\s\S]*?~~~/g, m => m.replace(/[^\n]/g, " ")).replace(/`[^`\n]*`/g, m => " ".repeat(m.length));
+
+/**
+ * The images a note uses: Theater buttons, embeds, and image links (which Codex can't follow).
+ * @returns {{kind: "place"|"cast"|"embed"|"link", name: string, line: number, raw: string}[]}
+ */
+export function assetRefs(text) {
+  const src = withoutCode(text);
+  const lineAt = i => src.slice(0, i).split("\n").length - 1;
+  const out = [];
+  for ( const m of src.matchAll(/@(Place|Cast)\[([^\]]+)\]/g) ) {
+    const name = m[2].split("|")[0].trim();
+    if ( !name || /^(off|clear)$/i.test(name) ) continue;
+    out.push({ kind: m[1].toLowerCase(), name, line: lineAt(m.index), raw: m[0] });
+  }
+  for ( const m of src.matchAll(/(!?)\[\[([^\]|#]+?\.(?:webp|png|jpe?g|gif|avif))(?:[|#][^\]]*)?\]\]/gi) ) {
+    out.push({ kind: m[1] ? "embed" : "link", name: m[2].trim(), line: lineAt(m.index), raw: m[0] });
+  }
+  for ( const m of src.matchAll(/!\[[^\]]*\]\(([^)\s]+?\.(?:webp|png|jpe?g|gif|avif))\)/gi) ) {
+    out.push({ kind: "embed", name: decodeURIComponent(m[1]), line: lineAt(m.index), raw: m[0] });
+  }
+  return out;
+}
+
+/**
+ * Which image a reference reaches. Theater buttons: Theater's own search (exact, then "starts with", then "contains")
+ * over the place images (Places/, Scenes/) or the NPC cards (any NPCs/ folder). Embeds: the file, by name (Obsidian) or path.
+ * @returns {{hits: object[], how: "exact"|"prefix"|"contains"|"file"|null}}
+ */
+export function resolveAsset(assets, ref) {
+  if ( ref.kind === "place" || ref.kind === "cast" ) {
+    const pool = assets.filter(a => a.group === ref.kind);
+    const q = foldAsset(ref.name);
+    for ( const [how, test] of [["exact", a => a === q], ["prefix", a => a.startsWith(q)], ["contains", a => a.includes(q)]] ) {
+      const hits = pool.filter(a => test(foldAsset(a.label)));
+      if ( hits.length ) return { hits, how };
+    }
+    return { hits: [], how: null };
+  }
+  const want = ref.name.replace(/\\/g, "/").replace(/^.*?Visuals\/(WebP\/)?/i, "");
+  const stem = want.split("/").pop().replace(/\.[^.]+$/, "").toLowerCase();
+  const hits = assets.filter(a => a.rel.toLowerCase() === want.replace(/\.[^.]+$/, ".webp").toLowerCase()
+    || a.file.replace(/\.[^.]+$/, "").toLowerCase() === stem);
+  return { hits, how: hits.length ? "file" : null };
+}
+
+/** The server path of an image in the mirror. */
+export const serverPath = asset => `${SERVER_ROOT}/${asset.rel}`;
+
+function checkAssets(n, t, err, warn) {
+  if ( !t.assets?.length ) return [];
+  const used = [];
+  for ( const ref of assetRefs(n.text) ) {
+    const where = ref.kind === "place" ? "Visuals/WebP/Places or Scenes" : ref.kind === "cast" ? "an NPCs folder of Visuals/WebP" : "Visuals/WebP";
+    if ( ref.kind === "link" ) {
+      err(`\`${ref.raw}\`: a link to an image, which Codex shows as a broken link. Use a Theater button, or embed it with \`![[…webp]]\``, ref.line);
+      continue;
+    }
+    const { hits, how } = resolveAsset(t.assets, ref);
+    if ( !hits.length ) {
+      err(`\`${ref.raw}\`: no image in ${where} is called that, so it can't be on the server either (check the name, or run Tools/make_webp.py)`, ref.line);
+      continue;
+    }
+    const pick = hits[0];
+    used.push({ ref, asset: pick });
+    if ( pick.scratch ) warn(`\`${ref.raw}\` uses a scratch image (\`_work/\`), which isn't uploaded`, ref.line);
+    if ( ref.kind === "embed" && !/\.webp$/i.test(ref.name) ) warn(`\`${ref.raw}\` embeds the original; Foundry has only the WebP copy: embed \`${pick.file}\``, ref.line);
+    if ( hits.length > 1 && how !== "exact" ) {
+      warn(`\`${ref.raw}\` matches ${hits.length} images by ${how === "prefix" ? "the start of the name" : "a part of the name"}; Theater shows whichever comes first in its list. Write the full name (e.g. «${hits[0].label}»)`, ref.line);
+    }
+    else if ( hits.length > 1 ) warn(`\`${ref.raw}\`: ${hits.length} images have this exact name (${hits.map(serverPath).join(", ")})`, ref.line);
+  }
+  return used;
+}
+
+/* -------------------------------------------- */
 /*  Checks                                      */
 /* -------------------------------------------- */
 
@@ -135,6 +242,17 @@ export function checkNote(n, t, all = []) {
     const names = [name, ...n.aliases];
     if ( !names.some(hasGreek) ) warn("no Greek name in `aliases`: a Greek search in the Lens won't find this note");
     if ( !names.some(hasLatin) ) warn("no English name in `aliases`");
+  }
+
+  // Place and NPC notes (Codex 0.8 cards): sections the card knows; anything else is shown at the end, so a typo shows.
+  if ( n.type === "place" || n.type === "npc" ) {
+    const card = L.parseCard(n.text, n.type);
+    if ( !card.name ) err("no `# Title` heading: the card has no name");
+    if ( !n.fm.key ) warn("no `key:` in the frontmatter (the place's or person's stable id, e.g. `key: wayfarer`)");
+    const known = Object.values(n.type === "place" ? L.PLACE_SECTIONS : L.NPC_SECTIONS).map(list => list[0]);
+    for ( const sec of card.sections.filter(x => !x.id) ) warn(`section «${sec.heading}» isn't one the ${n.type === "place" ? "place" : "NPC"} card knows (${known.join(", ")}): it shows at the end`, sec.line);
+    if ( n.type === "npc" && card.by.voice && !Object.keys(L.voiceOf(card.by.voice.body)).length ) warn("«Φωνή και τρόπος» has no **Μιλάει:** / **Κινείται:** / **Σημάδι:** / **Ατάκες:** bullets: the roleplay strip shows the section as text", card.by.voice.line);
+    if ( n.type === "npc" && card.by.wfh && !Object.keys(L.wfhOf(card.by.wfh.body)).length ) warn("«Θέλει · Φοβάται · Κρύβει» has no **Θέλει:** / **Φοβάται:** / **Κρύβει:** bullets", card.by.wfh.line);
   }
 
   // People: an NPC note, or a note tagged `people`.
@@ -174,6 +292,9 @@ export function checkNote(n, t, all = []) {
       if ( !L.stripMd(r.status) ) warn(`#${r.n}: no Status`, r.line);
     }
   }
+
+  // Images: every Theater button and embed must reach an image in the WebP mirror (what goes to the server).
+  Object.defineProperty(out, "assets", { value: checkAssets(n, t, err, warn), enumerable: false });
 
   // The deck.
   const beats = /\[!beat\b/i.test(n.text) ? parseBeats(n.text) : [];
@@ -249,8 +370,18 @@ export function run(vault, { only = null } = {}) {
   const everything = readNotes(vault);
   const table = readTable(vault, everything);
   const notes = only ? everything.filter(n => n.path === only) : everything;
-  const results = notes.map(n => ({ path: n.path, findings: checkNote(n, table, everything) })).filter(r => r.findings.length);
+  const all = notes.map(n => { const findings = checkNote(n, table, everything); return { path: n.path, findings, assets: findings.assets ?? [] }; });
+  const results = all.filter(r => r.findings.length);
   results.otherBooks = [...(table.otherBooks ?? [])].sort();
+  // Every image the notes use, once, with where it lives on the server.
+  const seen = new Map();
+  for ( const r of all ) for ( const { asset } of r.assets ) {
+    if ( !seen.has(asset.rel) ) seen.set(asset.rel, { server: serverPath(asset), vault: `Visuals/WebP/${asset.rel}`, notes: [] });
+    const e = seen.get(asset.rel);
+    if ( !e.notes.includes(r.path) ) e.notes.push(r.path);
+  }
+  results.assets = [...seen.values()].sort((a, b) => a.server.localeCompare(b.server));
+  for ( const r of results ) delete r.assets;
   return results;
 }
 
@@ -259,13 +390,13 @@ if ( isMain ) {
   const args = process.argv.slice(2);
   const vault = args.find(a => !a.startsWith("--"));
   if ( !vault ) {
-    console.error("Usage: node tools/ready-check.mjs <vault> [--note <path in the vault>] [--json]");
+    console.error("Usage: node tools/ready-check.mjs <vault> [--note <path in the vault>] [--json] [--assets]");
     process.exit(2);
   }
   const i = args.indexOf("--note");
   const only = i >= 0 ? args[i + 1]?.replace(/\\/g, "/") : null;
   const results = run(vault, { only });
-  if ( args.includes("--json") ) console.log(JSON.stringify(results, null, 2));
+  if ( args.includes("--json") ) console.log(JSON.stringify(args.includes("--assets") ? { notes: [...results], otherBooks: results.otherBooks, assets: results.assets } : results, null, 2));
   else {
     let e = 0, w = 0;
     for ( const r of results ) {
@@ -276,6 +407,10 @@ if ( isMain ) {
       }
     }
     if ( results.otherBooks.length ) console.log(`\nCited, not in the Library (Sources/INDEX.md): ${results.otherBooks.join(", ")}`);
+    if ( args.includes("--assets") ) {
+      console.log(`\nImages used (${results.assets.length}): each must be on the server at User Data/<path> (upload Visuals/WebP → ${SERVER_ROOT}/ with the same folders)`);
+      for ( const a of results.assets ) console.log(`  ${a.server}${only ? "" : `   ← ${a.notes.join(", ")}`}`);
+    }
     console.log(`\n${e} error(s), ${w} warning(s) in ${results.length} note(s).`);
     process.exitCode = e ? 1 : 0;
   }

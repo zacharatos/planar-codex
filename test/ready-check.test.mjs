@@ -70,3 +70,55 @@ test("ready check: card kinds (0.7): unknown, unclear, contradicting, rule as mu
   assert.ok(deck.some(m => /«Rule: must is wrong»: a rule card is a reminder/.test(m)));
   assert.ok(!deck.some(m => /«Rule: fine»/.test(m)));
 });
+
+test("ready check: images: Theater buttons and embeds reach the WebP mirror, with their server path", async () => {
+  const { assetRefs, resolveAsset, assetLabel } = await import("../tools/ready-check.mjs");
+  const dir = vault();
+  const w = (p, text = "") => { fs.mkdirSync(path.dirname(path.join(dir, p)), { recursive: true }); fs.writeFileSync(path.join(dir, p), text); };
+  w("Visuals/WebP/Scenes/Chapter02/Ch02 - 04 - The Wayfarer.webp");
+  w("Visuals/WebP/Scenes/Chapter02/Ch02 - 04 - The Wayfarer + Riaen.webp");
+  w("Visuals/WebP/Places/Sigil/08 - Bottle and Jug.webp");
+  w("Visuals/WebP/Places/Sigil/08 - Bottle and Jug - the pit.webp");
+  w("Visuals/WebP/Characters/NPCs/Part 01 - Sigil/Parisa.webp");
+  w("Visuals/WebP/Maps/Dungeon Alchemist/_work/test.webp");
+  w("Prep/Session 02 - run sheet.md", "---\ntype: prep\n---\n" + [
+    "Go: @Place[Ch02 - 04 - The Wayfarer]{Inn} and @Cast[Parisa] · @Place[off]",
+    "@Place[Bottle and Jug | to=Ilsa] is exact; @Place[Bottle] isn't; @Place[The Moon Gate]; @Cast[The orc]",
+    "![[Ch02 - 04 - The Wayfarer.webp|400]] ![[Ch02 - 04 - The Wayfarer.png]] [[Parisa.webp|her]] ![[test.webp]]",
+    "`@Place[Not checked in code]`"
+  ].join("\n"));
+  const results = run(dir);
+  const f = (results.find(r => r.path === "Prep/Session 02 - run sheet.md")?.findings ?? []).map(x => `${x.level}: ${x.msg}`);
+  assert.ok(f.some(m => /^error: `@Place\[The Moon Gate\]`: no image/.test(m)));
+  assert.ok(f.some(m => /^error: `@Cast\[The orc\]`: no image in an NPCs folder/.test(m)));
+  assert.ok(f.some(m => /^warn: `@Place\[Bottle\]` matches 2 images by the start of the name/.test(m)));
+  assert.ok(f.some(m => /^warn: `!\[\[Ch02 - 04 - The Wayfarer\.png\]\]` embeds the original/.test(m)));
+  assert.ok(f.some(m => /^error: `\[\[Parisa\.webp\|her\]\]`: a link to an image/.test(m)));
+  assert.ok(f.some(m => /scratch image \(`_work\/`\)/.test(m)));
+  assert.ok(!f.some(m => /Not checked|Ch02 - 04 - The Wayfarer\]|Bottle and Jug \||@Cast\[Parisa\]|off/.test(m)), f.join("\n"));
+  const servers = results.assets.map(a => a.server);
+  assert.ok(servers.includes("dnd/Scenes/Chapter02/Ch02 - 04 - The Wayfarer.webp"));
+  assert.ok(servers.includes("dnd/Places/Sigil/08 - Bottle and Jug.webp"));
+  assert.ok(servers.includes("dnd/Characters/NPCs/Part 01 - Sigil/Parisa.webp"));
+  // The pieces: Theater's labels and search.
+  assert.equal(assetLabel("Places/Sigil/08 - Bottle and Jug.webp"), "Bottle and Jug");
+  assert.equal(assetLabel("Scenes/Chapter02/Ch02 - 04 - The Wayfarer.webp"), "Ch02 - 04 - The Wayfarer");
+  assert.deepEqual(assetRefs("x\n@Cast[Fell | to=Ilsa]").map(r => [r.kind, r.name, r.line]), [["cast", "Fell", 1]]);
+  const assets = [{ rel: "Places/a/01 - Ab.webp", label: "Ab", group: "place", file: "01 - Ab.webp" }];
+  assert.equal(resolveAsset(assets, { kind: "place", name: "ÁB" }).how, "exact");
+  assert.equal(resolveAsset(assets, { kind: "cast", name: "Ab" }).hits.length, 0, "an NPC card isn't a place");
+});
+
+test("ready check: place and NPC notes: name, key, sections the card knows", () => {
+  const dir = vault();
+  const w = (p, text) => { fs.mkdirSync(path.dirname(path.join(dir, p)), { recursive: true }); fs.writeFileSync(path.join(dir, p), text); };
+  w("Campaign/Places/Good.md", "---\ntype: place\nkey: good\naliases: [Good, Καλό]\n---\n# Καλό (Good)\n\n## Με μια ματιά\n- x\n");
+  w("Campaign/Places/Typo.md", "---\ntype: place\naliases: [Typo, Λάθος]\n---\n# Λάθος (Typo)\n\n## Με μια ματια ξανά\n- x\n");
+  w("Campaign/NPCs/Flat.md", "---\ntype: npc\nkey: flat\naliases: [Flat, Επίπεδος]\n---\n# Επίπεδος (Flat)\n\n## Φωνή και τρόπος\nJust prose.\n");
+  const results = run(dir);
+  const of = p => (results.find(r => r.path === p)?.findings ?? []).map(f => `${f.level}: ${f.msg}`);
+  assert.deepEqual(of("Campaign/Places/Good.md"), []);
+  assert.ok(of("Campaign/Places/Typo.md").some(m => /no `key:`/.test(m)));
+  assert.ok(of("Campaign/Places/Typo.md").some(m => /section «Με μια ματια ξανά» isn't one the place card knows/.test(m)));
+  assert.ok(of("Campaign/NPCs/Flat.md").some(m => /roleplay strip shows the section as text/.test(m)));
+});

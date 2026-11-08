@@ -350,7 +350,15 @@
         "visited": "visited"
       },
       "Prepared": "not met yet",
-      "PreparedHint": "From the prep: the party hasn't met them (they aren't in the NPC notes yet)."
+      "PreparedHint": "From the prep: the party hasn't met them (they aren't in the NPC notes yet).",
+      "Hide": "Hides",
+      "Speaks": "Speaks",
+      "Moves": "Moves",
+      "Sheet": "Sheet",
+      "Sources": "Sources and links",
+      "AsPlayed": "As played (npcs)",
+      "RollEvent": "Roll on this table (the roll goes to your chat only)",
+      "EventRolled": "{place}: what happens"
     },
     "Library": {
       "Title": "Library",

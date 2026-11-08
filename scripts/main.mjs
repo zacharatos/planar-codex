@@ -88,8 +88,14 @@ Hooks.once("init", () => {
     lens: {
       open: (query = "") => { if ( query ) setLensTarget(query); return PrompterPanel.open({ tab: "lens" }); },
       show: query => setLensTarget(query),
-      gather: query => lensGather(query)
+      gather: query => lensGather(query),
+      /** The place and NPC cards for a name (0.8): [{kind, key, names, card: {name, aliases, sections, by}, theater, scape, atlas, book, page}]. */
+      cards: query => { const d = lensGather(query); return d ? [...d.placeCards, ...d.npcCards] : []; }
     },
+    /** A place's card (0.8), for the Atlas arrival card: the parsed note, or null. */
+    placeCard: name => lensGather(name)?.placeCards?.[0] ?? null,
+    /** Open the Lens on a place (or person). */
+    openPlace: name => { setLensTarget(name); return PrompterPanel.open({ tab: "lens" }); },
     library: libraryApi,
     openImporter: () => new CodexImporter().render({ force: true }),
     openExporter: () => new CodexExporter().render({ force: true })
