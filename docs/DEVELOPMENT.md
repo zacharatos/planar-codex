@@ -145,6 +145,7 @@ Prompter (harness first: `npm run harness`, then /test/harness/prompter.html; `w
 - Open a second GM tab: in the one that isn't the active GM, a red banner says nothing is heard or logged there.
 - After a Long Rest (or 30 min with nothing at the table, kept running), a banner offers *Close*; *Not yet* hides it until something new happens.
 - Close more than 45 min after the last event: the dialog offers "Close as of <time>" (ticked); the log's *Closed* and *Played* use that time; *Last at the table* shows it.
+- *Notes and what the modules saw*: click its heading to fold it; the heading shows the latest line; add a note (the panel re-renders): it stays folded; reload: still folded. Click again to open (0.7.1).
 - Notes with tags; delete one. The feed shows whispers sent and read, purse changes, stops, Heroic Inspiration, deaths.
 - **Kinds (0.7):** each card has a coloured badge (dashed = guessed). The harness sheet: *The forged deed* is a clue (🔍, found / not found), *Night whispers* a whisper, *Rule: Brannoc's bad knee* sits in the folded *Rules* section, *Dust in the stacks* shows «What kind?». Pick *Rule* there: the run sheet's line gets `kind=rule` (open the note) and the card moves to *Rules*.
 - Filter chips: each one shows only its kind in every section; click it again (or *All*) to see everything. Reload: the chip is remembered (per GM user).

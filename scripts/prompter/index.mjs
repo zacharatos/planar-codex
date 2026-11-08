@@ -27,6 +27,8 @@ export function initPrompter() {
     scope: "world", config: true, type: Boolean, default: true
   });
   // The filter chip the GM last picked (Όλα, Σκηνές, Στοιχεία …): per GM user, not per browser.
+  // Whether "Notes and what the modules saw" is unfolded (per GM user).
+  register("prompterFeedOpen", { scope: "user", config: false, type: Boolean, default: true });
   register(FILTER_SETTING, { scope: "user", config: false, type: String, default: "all", onChange: () => PrompterPanel.instance?.renderSoon() });
   register("prompterAutoOpen", {
     name: "PLANARCODEX.Settings.PrompterAutoOpen", hint: "PLANARCODEX.Settings.PrompterAutoOpenHint",

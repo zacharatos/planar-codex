@@ -729,3 +729,13 @@ img.codex-image { max-width: 100%; height: auto; border: none; border-radius: 4p
 @media (prefers-reduced-motion: reduce) {
   .codex-rule-toast.codex-rt-flash { animation: none; }
 }
+
+/* 0.7.1: the feed folds; folded, its summary shows the latest line. */
+.codex-prompter .pr-feed { margin-top: 10px; }
+.codex-prompter .pr-feed > summary { white-space: nowrap; overflow: hidden; }
+.codex-prompter .pr-feed-last {
+  display: inline-block; max-width: 58%; vertical-align: bottom; overflow: hidden; text-overflow: ellipsis; margin-left: 6px;
+  font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--pr-muted);
+}
+.codex-prompter .pr-feed[open] .pr-feed-last { display: none; }
+.codex-prompter .pr-feed > ul { margin-top: 4px; }

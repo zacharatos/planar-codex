@@ -301,7 +301,7 @@
       "FilterEmpty": "No cards of this kind in tonight's deck.",
       "Found": "Found",
       "NotFound": "Not found",
-      "Sent": "Sent",
+      "Sent": "Mark as sent (the Whisper button on the card sends it)",
       "OpenLens": "Open {name} in the Lens",
       "RuleShow": "Show this rule now",
       "RuleDismiss": "Dismiss",

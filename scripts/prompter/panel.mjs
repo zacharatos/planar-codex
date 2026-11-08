@@ -30,6 +30,9 @@ const esc = escapeHTML;
 const hhmm = iso => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
 const DONE = ["played", "skipped"];
 const UNDO_MS = 6000;
+const FEED_SETTING = "prompterFeedOpen";
+const feedOpen = () => { try { return game.settings.get(MODULE_ID, FEED_SETTING) !== false; } catch(err) { return true; } };
+const setFeedOpen = open => game.settings.set(MODULE_ID, FEED_SETTING, !!open).catch(() => {});
 /** Offer to close after this long with nothing happening at the table. */
 const IDLE_MINUTES = 30;
 
@@ -301,7 +304,7 @@ export class PrompterPanel extends ApplicationV2 {
     const pcs = b.pc.map(n => `<span class="pr-pc">${esc(n)}</span>`).join("");
     const trig = b.at.map(t => `<span class="pr-trig ${isKindOfMoment(t) ? "pr-kind" : ""}">${esc(t)}</span>`).join("");
     // A clue is found or not found; a whisper is sent; the rest are played or skipped.
-    const ok = { clue: ["Prompter.Found", "fa-magnifying-glass-plus"], whisper: ["Prompter.Sent", "fa-paper-plane"] }[info.kind] ?? ["Prompter.Played", "fa-check"];
+    const ok = { clue: ["Prompter.Found", "fa-magnifying-glass-plus"], whisper: ["Prompter.Sent", "fa-check"] }[info.kind] ?? ["Prompter.Played", "fa-check"];
     const no = info.kind === "clue" ? ["Prompter.NotFound", "fa-eye-slash"] : ["Prompter.Skip", "fa-xmark"];
     const doneMark = st === "played" ? (info.kind === "clue" ? "🔍" : "✓") : "✗";
     const lensBtn = info.kind === "npc" && !isDone ? `<button type="button" class="pr-btn pr-lens" data-pr="lens-npc" data-tooltip="${esc(localize("Prompter.OpenLens", { name: this.#personOf(b) }))}"><i class="fa-solid fa-user"></i></button>` : "";
@@ -368,8 +371,12 @@ export class PrompterPanel extends ApplicationV2 {
     ].sort((a, b) => b.t.localeCompare(a.t)).slice(0, 12);
     const heard = recentContexts().slice(0, 1)[0];
     if ( !items.length && !heard ) return "";
-    return `<section class="pr-section pr-feed"><h3><i class="fa-solid fa-satellite-dish"></i> ${localize("Prompter.Section.Feed")}</h3>
-      <ul>${items.map(i => `<li class="${i.note ? "pr-feed-note" : ""}"><span class="pr-t">${hhmm(i.t)}</span> ${i.html}</li>`).join("")}</ul></section>`;
+    // Folds away (remembered per GM); folded, the summary still shows the latest line.
+    const open = feedOpen();
+    const last = items[0] ? `<span class="pr-feed-last"><span class="pr-t">${hhmm(items[0].t)}</span> ${items[0].html.replace(/<a class="pr-del"[\s\S]*?<\/a>/, "")}</span>` : "";
+    const total = r.notes.length + r.events.length;
+    return `<details class="pr-fold pr-feed" ${open ? "open" : ""}><summary><i class="fa-solid fa-satellite-dish"></i> ${localize("Prompter.Section.Feed")} <span class="pr-count">${total}</span>${last}</summary>
+      <ul>${items.map(i => `<li class="${i.note ? "pr-feed-note" : ""}"><span class="pr-t">${hhmm(i.t)}</span> ${i.html}</li>`).join("")}</ul></details>`;
   }
 
   #noteBox() {
@@ -415,6 +422,10 @@ export class PrompterPanel extends ApplicationV2 {
     if ( !root.dataset.prompterWired ) {
       root.dataset.prompterWired = "1";
       root.addEventListener("click", ev => this.#onClick(ev));
+      // <details> toggles don't bubble: listen in the capture phase. The feed's open/closed state is remembered.
+      root.addEventListener("toggle", ev => {
+        if ( ev.target.matches?.("details.pr-feed") && ev.target.open !== feedOpen() ) setFeedOpen(ev.target.open);
+      }, true);
       root.addEventListener("submit", ev => {
         ev.preventDefault();
         if ( ev.target.closest(".lens-search") ) onLensSearch(ev.target.closest(".lens-search"));

@@ -3,6 +3,14 @@
 All notable changes to this module. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 The release workflow uses the section matching the tag as the GitHub release notes, so keep the `## [x.y.z]` headings exact.
 
+## [0.7.1]
+
+From the first try of 0.7.0 at the table.
+
+### Changed
+- *Notes and what the modules saw* folds away: click its heading. Folded, the heading still shows the latest line; open or folded is remembered per GM.
+- A whisper card's "sent" button is a ✓ again, not a paper plane: it only marks the card, and the plane looked like it would send the line (the card's own *Whisper* button sends it).
+
 ## [0.7.0]
 
 Codex 0.7 "Cards", part 1: card kinds and rule toasts. (The Place and NPC cards, keys and the Now strip follow.)
