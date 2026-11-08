@@ -632,7 +632,9 @@ img.codex-image { max-width: 100%; height: auto; border: none; border-radius: 4p
 .codex-prompter .lens-books .lens-btn { margin-top: 4px; }
 
 /* ----- Library ----- */
-.codex-library .window-content { padding: 0; font-family: var(--codex-font); }
+/* Like the console, the Library scrolls itself: V14 windows clip their content. */
+.codex-library .window-content { padding: 0; font-family: var(--codex-font); overflow-y: auto; overscroll-behavior: contain; }
+.codex-library-import .window-content { overflow-y: auto; }
 .codex-library .lib { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 12px; }
 .codex-library .lib-search { display: flex; gap: 6px; align-items: center; position: sticky; top: 0; z-index: 1; padding: 4px 0; background: var(--color-cool-5, #1b1a18); }
 .codex-library .lib-search input[name=q] { flex: 1; height: 28px; }

@@ -98,7 +98,8 @@ export class LibraryWindow extends ApplicationV2 {
         ${scope}
         <button type="button" class="lib-icon" data-lib="import" data-tooltip="${esc(localize("Library.ImportTitle"))}"><i class="fa-solid fa-book-medical"></i></button>
       </form>`;
-    const msg = s.message ? `<p class="lib-message"><i class="fa-solid fa-circle-info"></i> ${s.message}</p>` : "";
+    // An empty Library says so once, in the body (not again as a notice).
+    const msg = s.message && books.length ? `<p class="lib-message"><i class="fa-solid fa-circle-info"></i> ${s.message}</p>` : "";
     let body;
     if ( !books.length ) body = `<div class="lib-empty"><p>${localize("Library.Empty")}</p><button type="button" data-lib="import"><i class="fa-solid fa-book-medical"></i> ${localize("Library.ImportTitle")}</button></div>`;
     else if ( s.view === "search" ) body = this.#results();

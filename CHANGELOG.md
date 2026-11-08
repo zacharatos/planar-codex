@@ -11,6 +11,7 @@ Lens cards in a narrow window, after the first try at the table.
 
 - Card tables (*Τι ξέρει*, *Μυστικά*) no longer run off the card: long words wrap, and in a narrow Lens each row stacks, with its column heading above each cell.
 - Rows with buttons (Atlas card, Move the party, Show, Open the shop) wrap cleanly and keep their buttons to the right, instead of floating at uneven heights.
+- The Library didn't scroll: a long section or chapter was cut off at the bottom of the window (V14 windows clip their content; the Library now scrolls itself, like the console, and the import window too). An empty Library shows its message once instead of twice.
 - Typed links (`[[monster:Cranium Rat Squeakers]]`, `[[actor:…]]`) missed actors imported with a source tag in their name (Plutonium's «Cranium Rat Squeaker (MPP)», «Bandit (MM'25)»): the lookup now tries the exact name, then the name without a tag of two or more capitals (so «Farrow (Glitch)» stays distinct), then singular / plural.
 - An NPC card's *As played* showed «Want / Fear / Tell» twice when a prep note had its own line for the same person: a prep note's line now shows only when `npcs.md` has nothing of that kind.
 
