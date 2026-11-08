@@ -12,18 +12,20 @@ import { MODULE_ID, localize, convert, getMarkdown, isCodexPage, updateMarkdown 
 import { escapeHTML } from "../markdown.mjs";
 import { decorateCallouts } from "../actions.mjs";
 import { createCodexNote } from "../notes.mjs";
-import { parseNote, buildLiveLog, pad2, duration, hash, isKindOfMoment, NOTE_TAGS, lastActivity, closeNudge, isNight, KINDS, KIND_ICONS } from "./core.mjs";
+import { parseNote, buildLiveLog, pad2, duration, hash, isKindOfMoment, NOTE_TAGS, lastActivity, closeNudge, isNight, KINDS, KIND_ICONS, nowCards } from "./core.mjs";
 import { kindInfo, kindOf, kindFilter, setKindFilter, writeKind } from "./kinds.mjs";
 import { showRuleToast } from "./toasts.mjs";
 import {
   subscribe, sheetPage, setSheet, candidateSheets, readSheet, run, mutateRun, setBeat, addNote, removeNote,
   asleep, absentHeroes, spotlight, setPresent, livePresence, flush
 } from "./state.mjs";
-import { hotBeats, cool, hear, recentContexts, whispersSince, moduleApi, isActiveGM, gmRest } from "./context.mjs";
+import { hotBeats, cool, hear, recentContexts, whispersSince, moduleApi, isActiveGM, gmRest, herePlace, seenPeople } from "./context.mjs";
 import { lens, setLensTarget } from "../lens/index.mjs";
 import { renderLens, onLensClick, onLensSearch, labelTableCells } from "../lens/view.mjs";
 import { openLibrary, wireCitations } from "../library/index.mjs";
-import { assetsVersion, thingFor } from "../keys/index.mjs";
+import { assetsVersion, thingFor, triggerNames } from "../keys/index.mjs";
+import { placeCardFor, npcCardNamed } from "../lens/data.mjs";
+import { namesFromLabel, wfhOf, stripMd } from "../lens/core.mjs";
 import { parseKey } from "../keys/core.mjs";
 
 const { ApplicationV2, DialogV2 } = foundry.applications.api;
@@ -100,6 +102,9 @@ export class PrompterPanel extends ApplicationV2 {
   /** The last ✓ / ✗ / later, for the Undo bar: {id, prev, text, until}. */
   #undo = null;
   #undoTimer = null;
+  /** The cards in the Now strip, in order (keys 1 / 2 / 3 play them), and the place it was built for. */
+  nowIds = [];
+  #nowPlace = null;
   /** Cards whose kind picker is open (the GM clicked the kind badge). */
   picking = new Set();
   /** The close offer on screen ("rest" | "idle" | null), and the activity the GM last said "not yet" to. */
@@ -108,9 +113,16 @@ export class PrompterPanel extends ApplicationV2 {
 
   get title() { return localize(this.tab === "lens" ? "Lens.Title" : "Prompter.Title"); }
 
+  /** Did the GM last click inside this window? Then plain keys are ours (see #onKey), else they're Foundry's (the hotbar). */
+  #focused = false;
+  #onPointer = ev => { this.#focused = !!this.element?.contains(ev.target); };
+  #onKeyBound = ev => this.#onKey(ev);
+
   _onFirstRender(context, options) {
     super._onFirstRender?.(context, options);
     this.#unsubscribe = subscribe(() => this.renderSoon());
+    document.addEventListener("pointerdown", this.#onPointer, true);
+    document.addEventListener("keydown", this.#onKeyBound, true);
     this.#ticker = setInterval(() => this.#tick(), 30000);
   }
 
@@ -118,6 +130,8 @@ export class PrompterPanel extends ApplicationV2 {
     super._onClose?.(options);
     this.#unsubscribe?.();
     this.#unsubscribe = null;
+    document.removeEventListener("pointerdown", this.#onPointer, true);
+    document.removeEventListener("keydown", this.#onKeyBound, true);
     clearInterval(this.#ticker);
     PrompterPanel.instance = null;
   }
@@ -162,10 +176,13 @@ export class PrompterPanel extends ApplicationV2 {
     const show = b => filter === "all" || kindOf(b) === filter;
     const isRule = b => kindOf(b) === "rule";
     const beats = sheet.beats;
+    const strip = this.#nowData(beats, r, hot);
+    const inStrip = new Set(strip.cards.map(x => x.beat.id));
+    this.nowIds = strip.cards.map(x => x.beat.id);
     // Rule cards are looked up, not played: their own section (folded unless the Κανόνες chip is on), never "missed".
     const rules = beats.filter(isRule).filter(show);
     const cards = beats.filter(b => !isRule(b));
-    const open = cards.filter(b => !DONE.includes(status(b.id)));
+    const open = cards.filter(b => !DONE.includes(status(b.id)) && !inStrip.has(b.id));
     const awake = open.filter(b => !asleep(b));
     const sleeping = open.filter(b => asleep(b)).filter(show);
     const must = awake.filter(b => b.priority === "must").filter(show);
@@ -192,10 +209,12 @@ export class PrompterPanel extends ApplicationV2 {
       ${this.#spotlight(page, r)}
       ${this.#filters(beats, r, filter)}
       ${r.active ? "" : `<div class="pr-start-hint"><i class="fa-solid fa-circle-info"></i> ${localize(r.closedAt ? "Prompter.ClosedHint" : "Prompter.StartHint")}</div>`}
-      ${section("pr-must", "fa-solid fa-circle-exclamation", localize("Prompter.Section.Must"), must, localize("Prompter.MustDone"))}
+      ${this.#nowStrip(strip, r, hot)}
+      ${section("pr-must", "fa-solid fa-circle-exclamation", localize("Prompter.Section.Must"), must, strip.cards.length ? "" : localize("Prompter.MustDone"))}
       ${section("pr-now", "fa-solid fa-bolt", localize("Prompter.Section.Now"), now)}
-      ${section("pr-deck", "fa-solid fa-layer-group", localize("Prompter.Section.Deck"), deck, localize("Prompter.DeckEmpty"))}
-      ${section("pr-watch", "fa-solid fa-ear-listen", localize("Prompter.Section.Watch"), watch)}
+      ${deck.length ? `<details class="pr-fold pr-deck" ${strip.cards.length ? "" : "open"}><summary><i class="fa-solid fa-layer-group"></i> ${localize("Prompter.Section.Deck")} <span class="pr-count">${deck.length}</span></summary>${deck.map(b => this.#card(b, r, hot)).join("")}</details>`
+        : section("pr-deck", "fa-solid fa-layer-group", localize("Prompter.Section.Deck"), deck, localize("Prompter.DeckEmpty"))}
+      ${watch.length ? `<details class="pr-fold pr-watch"><summary><i class="fa-solid fa-ear-listen"></i> ${localize("Prompter.Section.Watch")} <span class="pr-count">${watch.length}</span></summary>${watch.map(b => this.#card(b, r, hot)).join("")}</details>` : ""}
       ${sleeping.length ? `<details class="pr-fold pr-sleep"><summary><i class="fa-solid fa-moon"></i> ${localize("Prompter.Section.Sleeping")} <span class="pr-count">${sleeping.length}</span></summary>${sleeping.map(b => this.#card(b, r, hot)).join("")}</details>` : ""}
       ${rulesHTML}
       ${nothing ? `<p class="pr-none pr-filter-empty">${localize("Prompter.FilterEmpty")}</p>` : ""}
@@ -204,6 +223,110 @@ export class PrompterPanel extends ApplicationV2 {
       ${this.#noteBox()}
       ${this.#undoBar()}
     </div>`;
+  }
+
+  /**
+   * What the Now strip shows: where the party is (and its place card), who is here, and the two or three cards for it.
+   * @returns {{here: object|null, card: object|null, name: string, people: {name: string, q: string, tip: string, seen: boolean}[], cards: object[]}}
+   */
+  #nowData(beats, r, hot) {
+    const here = herePlace();
+    let card = null;
+    try { card = here ? placeCardFor(here.text) : null; } catch(err) { console.warn(err); }
+    const label = here ? namesFromLabel(here.text) : [];
+    const name = card ? (card.card.name || card.page.parent.name) : (label[0] ?? here?.text ?? "");
+    const places = here ? [...new Set([here.text, ...label, ...(card ? [...card.names, ...card.theater, card.atlas].filter(Boolean) : [])])] : [];
+    this.#nowPlace = here ? { name, q: card ? (card.card.name || card.names[0] || here.text) : (label[0] ?? here.text) } : null;
+    // Who is here: people the table just showed (Theater NPC cards), then the place card's regulars.
+    const people = [];
+    const add = (n, seen) => {
+      const q = n.card ? (n.card.name || n.page.parent.name) : n.name;
+      if ( !q || people.some(p => p.q === q) ) return;
+      const w = n.card ? wfhOf(n.card.by.wfh?.body) : {};
+      const tip = [w.want && `${localize("Lens.Want")}: ${stripMd(w.want)}`, w.fear && `${localize("Lens.Fear")}: ${stripMd(w.fear)}`].filter(Boolean).join(" · ");
+      people.push({ name: q, q, tip, seen });
+    };
+    const seenNames = seenPeople();
+    for ( const text of seenNames ) {
+      const first = namesFromLabel(text)[0] ?? text;
+      const c = (() => { try { return npcCardNamed(first); } catch(err) { return null; } })();
+      add(c ? { card: c.card, page: c.page } : { name: first }, true);
+    }
+    for ( const n of card?.who ?? [] ) add({ card: n.card, page: n.page }, false);
+    const people2 = seenNames.flatMap(t => [t, ...namesFromLabel(t)]);
+    const cards = r.active || here ? nowCards(beats, {
+      status: r.beats, hot, places, since: here?.t ?? null, people: people2, regulars: card?.regulars ?? [],
+      band: moduleApi("planar-atlas")?.clock?.()?.band ?? "", asleep, kindOf, expand: triggerNames
+    }) : [];
+    return { here, card, name, people, cards };
+  }
+
+  /** The band on top: here, who is here, and at most three cards (1 / 2 / 3 play them). */
+  #nowStrip(strip, r, hot) {
+    if ( !strip.here && !strip.cards.length ) return "";
+    const when = strip.here?.t ? hhmm(strip.here.t) : "";
+    const place = strip.here ? `<div class="pr-now-where">
+        <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+        <a class="pr-now-place" data-pr="now-place" data-tooltip="${esc(localize(strip.card ? "Prompter.NowStrip.PlaceTip" : "Prompter.NowStrip.NoCardTip", { name: strip.name }))}">${esc(strip.name)}</a>
+        <span class="pr-now-from">${esc([strip.here.label, when].filter(Boolean).join(" · "))}</span>
+        <a class="pr-now-card" data-pr="now-place">${localize(strip.card ? "Prompter.NowStrip.PlaceCard" : "Prompter.NowStrip.Lens")}</a>
+      </div>` : `<div class="pr-now-where pr-now-nowhere"><i class="fa-solid fa-location-dot" aria-hidden="true"></i> ${localize("Prompter.NowStrip.Nowhere")}</div>`;
+    const people = strip.people.length ? `<div class="pr-now-who"><span class="pr-now-lbl">${localize("Prompter.NowStrip.Here")}</span>
+      ${strip.people.map(p => `<button type="button" class="pr-now-npc ${p.seen ? "pr-seen" : ""}" data-pr="now-npc" data-q="${esc(p.q)}" ${p.tip || p.seen ? `data-tooltip="${esc([p.seen ? localize("Prompter.NowStrip.OnStage") : "", p.tip].filter(Boolean).join(" · "))}"` : ""}>${p.seen ? '<i class="fa-solid fa-eye" aria-hidden="true"></i> ' : ""}${esc(p.name)}</button>`).join("")}</div>` : "";
+    const cards = strip.cards.length ? strip.cards.map((x, i) => this.#card(x.beat, r, hot, { n: i + 1, why: x.why })).join("")
+      : `<p class="pr-none">${localize("Prompter.NowStrip.Empty")}</p>`;
+    return `<section class="pr-nowstrip" aria-label="${esc(localize("Prompter.NowStrip.Title"))}">
+      <div class="pr-now-title">${localize("Prompter.NowStrip.Title")} <span class="pr-now-keys" data-tooltip="${esc(localize("Prompter.NowStrip.KeysTip"))}"><i class="fa-regular fa-keyboard"></i> 1 · 2 · 3</span></div>
+      ${place}${people}${cards}</section>`;
+  }
+
+  /** Play the n-th card of the Now strip (keys 1 / 2 / 3, Alt+1 / 2 / 3 anywhere). */
+  playNow(n) {
+    const id = this.nowIds[n - 1];
+    const page = sheetPage();
+    if ( !id || !page ) return false;
+    this.#play(id, page);
+    return true;
+  }
+
+  #play(id, page) {
+    // Where it happened: only what called the card (if it was hot). The last thing heard can be anywhere.
+    const where = hotBeats().get(id)?.where ?? "";
+    this.#offerUndo(id, page, "Prompter.UndoPlayed", this.#titleOf(page, id));
+    setBeat(id, "played", where, page); this.expanded.delete(id); return cool(id);
+  }
+
+  #undoLast() {
+    const u = this.#undo;
+    if ( !u ) return;
+    this.#undo = null;
+    clearTimeout(this.#undoTimer);
+    mutateRun(r => { r.beats[u.id] = u.prev; }, sheetPage());
+  }
+
+  /**
+   * Keys at the table (§ 6.4): 1 / 2 / 3 play the Now cards, U undoes, R opens the place card. Only after a click in this
+   * window (until a click elsewhere) and never while typing, so the hotbar's digits work everywhere else.
+   */
+  #onKey(ev) {
+    if ( !this.#focused || !this.rendered || this.tab !== "prompter" ) return;
+    if ( ev.ctrlKey || ev.metaKey || ev.altKey || ev.repeat ) return;
+    if ( ev.target?.closest?.("input, textarea, select, [contenteditable=''], [contenteditable='true']") ) return;
+    const k = String(ev.key).toLowerCase();
+    let done = false;
+    if ( ["1", "2", "3"].includes(k) ) done = this.playNow(Number(k));
+    else if ( k === "u" ) { done = !!this.#undo; this.#undoLast(); }
+    else if ( k === "r" ) done = this.openHere();
+    if ( done ) { ev.preventDefault(); ev.stopPropagation(); }
+  }
+
+  /** Open the Lens on where the party is. */
+  openHere() {
+    if ( !this.#nowPlace ) return false;
+    setLensTarget(this.#nowPlace.q, { source: localize("Prompter.NowStrip.Title") });
+    this.tab = "lens";
+    this.render();
+    return true;
   }
 
   /** "Played: X · Undo" for a few seconds after ✓, ✗ or later (a misclick used to stick). */
@@ -302,7 +425,7 @@ export class PrompterPanel extends ApplicationV2 {
       <span class="pr-kind-ask">${localize(asked ? "Prompter.KindAsk" : "Prompter.KindChange")}</span>${chips}</div>`;
   }
 
-  #card(b, r, hot) {
+  #card(b, r, hot, { n = 0, why = "" } = {}) {
     const info = kindInfo(b);
     if ( info.kind === "rule" ) return this.#ruleCard(b, r, info);
     const st = r.beats[b.id]?.s ?? null;
@@ -324,11 +447,12 @@ export class PrompterPanel extends ApplicationV2 {
          <button type="button" class="pr-btn pr-no" data-pr="skip" data-tooltip="${esc(localize(no[0]))}"><i class="fa-solid ${no[1]}"></i></button>`;
     const asked = !info.sure && !info.written && !isDone;
     const picker = asked || this.picking.has(b.id) ? this.#kindPicker(b, info, asked) : "";
-    const classes = ["pr-card", `pr-${b.priority}`, `pr-kind-${info.kind}`, h && !isDone ? "pr-hot" : "", open ? "pr-open" : "", st === "later" ? "pr-later" : "", isDone ? `pr-${st}` : ""].filter(Boolean).join(" ");
+    const classes = ["pr-card", `pr-${b.priority}`, `pr-kind-${info.kind}`, h && !isDone ? "pr-hot" : "", open ? "pr-open" : "", st === "later" ? "pr-later" : "", isDone ? `pr-${st}` : "", n ? "pr-in-now" : ""].filter(Boolean).join(" ");
+    const num = n ? `<kbd class="pr-now-n" data-tooltip="${esc(localize(`Prompter.NowStrip.Why.${why || "must"}`))}">${n}</kbd>` : "";
     return `<article class="${classes}" data-beat="${esc(b.id)}">
       <div class="pr-row" data-pr="toggle">
         <i class="pr-caret fa-solid ${open ? "fa-caret-down" : "fa-caret-right"}"></i>
-        ${this.#kindBadge(b, info)}
+        ${num}${this.#kindBadge(b, info)}
         <span class="pr-title">${esc(b.title)}</span>
         <span class="pr-meta">${ledger}${missed}</span>
         <span class="pr-btns">${buttons}</span>
@@ -376,7 +500,7 @@ export class PrompterPanel extends ApplicationV2 {
 
   #feed(r) {
     const items = [
-      ...r.notes.map(n => ({ t: n.t, html: `${n.tags.map(t => `<span class="pr-tag">#${esc(t)}</span>`).join(" ")} ${esc(n.text)} <a class="pr-del" data-pr="del-note" data-note="${esc(n.id)}" data-tooltip="${esc(localize("Prompter.DeleteNote"))}"><i class="fa-solid fa-trash"></i></a>`, note: true })),
+      ...r.notes.map(n => ({ t: n.t, html: `${n.tags.map(t => `<span class="pr-tag">#${esc(t)}</span>`).join(" ")} ${esc(n.text)}${n.where ? ` <span class="pr-note-where">📍 ${esc(n.where)}</span>` : ""} <a class="pr-del" data-pr="del-note" data-note="${esc(n.id)}" data-tooltip="${esc(localize("Prompter.DeleteNote"))}"><i class="fa-solid fa-trash"></i></a>`, note: true })),
       ...r.events.map(e => ({ t: e.t, html: `<b>${esc(e.label ?? e.kind)}</b> ${esc(e.text)}` }))
     ].sort((a, b) => b.t.localeCompare(a.t)).slice(0, 12);
     const heard = recentContexts().slice(0, 1)[0];
@@ -390,7 +514,9 @@ export class PrompterPanel extends ApplicationV2 {
   }
 
   #noteBox() {
-    const tags = NOTE_TAGS.map(t => `<button type="button" class="pr-tagbtn" data-pr="tag" data-tag="${t}">#${t}</button>`).join("");
+    // One tap writes the note at once, with where the party is and the time; typed text goes with it. Shift-click adds the tag to the text instead.
+    const tip = esc(localize("Prompter.QuickTip"));
+    const tags = NOTE_TAGS.map(t => `<button type="button" class="pr-tagbtn ${t === "paid" ? "pr-tag-paid" : ""}" data-pr="tag" data-tag="${t}" data-tooltip="${tip}">${t === "paid" ? esc(localize("Prompter.QuickPaid")) : `#${t}`}</button>`).join("");
     return `<form class="pr-note" autocomplete="off">
       <input type="text" name="note" placeholder="${esc(localize("Prompter.NotePlaceholder"))}">
       <button type="submit" data-tooltip="${esc(localize("Prompter.AddNote"))}"><i class="fa-solid fa-plus"></i></button>
@@ -407,7 +533,7 @@ export class PrompterPanel extends ApplicationV2 {
     const lensKeep = lensInput && document.activeElement === lensInput ? { value: lensInput.value, sel: lensInput.selectionStart } : null;
     const folds = Object.fromEntries(Array.from(content.querySelectorAll("details.pr-fold")).map(d => [d.className, d.open]));
     content.innerHTML = result;
-    for ( const d of content.querySelectorAll("details.pr-fold") ) if ( folds[d.className] ) d.open = true;
+    for ( const d of content.querySelectorAll("details.pr-fold") ) if ( d.className in folds ) d.open = folds[d.className];
     scroller.scrollTop = top;
     const fresh = content.querySelector(".pr-note input");
     if ( fresh && keep ) {
@@ -524,26 +650,19 @@ export class PrompterPanel extends ApplicationV2 {
         if ( ev.target.closest(".pr-btns") ) return;
         if ( this.expanded.has(id) ) this.expanded.delete(id); else this.expanded.add(id);
         return this.render();
-      case "played": {
-        // Where it happened: only what called the card (if it was hot). The last thing heard can be anywhere.
-        const where = hotBeats().get(id)?.where ?? "";
-        this.#offerUndo(id, page, "Prompter.UndoPlayed", this.#titleOf(page, id));
-        setBeat(id, "played", where, page); this.expanded.delete(id); return cool(id);
-      }
+      case "played": return this.#play(id, page);
+      case "now-place": return this.openHere();
+      case "now-npc":
+        setLensTarget(target.dataset.q, { source: localize("Prompter.NowStrip.Title") });
+        this.tab = "lens";
+        return this.render();
       case "skip":
         this.#offerUndo(id, page, "Prompter.UndoSkipped", this.#titleOf(page, id));
         setBeat(id, "skipped", "", page); this.expanded.delete(id); return cool(id);
       case "later":
         this.#offerUndo(id, page, "Prompter.UndoLater", this.#titleOf(page, id));
         setBeat(id, "later", "", page); this.expanded.delete(id); return cool(id);
-      case "undo": {
-        const u = this.#undo;
-        if ( !u ) return;
-        this.#undo = null;
-        clearTimeout(this.#undoTimer);
-        mutateRun(r => { r.beats[u.id] = u.prev; }, page);
-        return;
-      }
+      case "undo": return this.#undoLast();
       case "rest": return gmRest(!!target.dataset.long);
       case "filter": {
         const k = target.dataset.kind;
@@ -584,7 +703,7 @@ export class PrompterPanel extends ApplicationV2 {
       case "close-session": return closeSession(page);
       case "write-log": return writeLiveLog(page, { open: true });
       case "del-note": return removeNote(target.dataset.note, page);
-      case "tag": return this.#insert(`#${target.dataset.tag} `);
+      case "tag": return ev.shiftKey ? this.#insert(`#${target.dataset.tag} `) : this.#quickNote(target.dataset.tag);
       case "hero-note": return this.#insert(`${target.dataset.name}: `);
     }
   }
@@ -598,11 +717,22 @@ export class PrompterPanel extends ApplicationV2 {
     input.focus();
   }
 
+  /** A note in one tap: the tag, what's typed (if anything), where the party is. */
+  #quickNote(tag) {
+    const input = this.element.querySelector(".pr-note input");
+    const { text, tags } = parseNote(input?.value ?? "", [tag]);
+    const note = { text, tags };
+    if ( this.#nowPlace?.name ) note.where = this.#nowPlace.name;
+    addNote(note);
+    if ( input ) input.value = "";
+    ui.notifications.info(localize("Prompter.QuickSaved", { tag: `#${tag}`, where: note.where ?? "—" }));
+  }
+
   #submitNote() {
     const input = this.element.querySelector(".pr-note input");
     const { text, tags } = parseNote(input?.value ?? "");
     if ( !text && !tags.length ) return;
-    addNote({ text, tags });
+    addNote(this.#nowPlace?.name ? { text, tags, where: this.#nowPlace.name } : { text, tags });
     input.value = "";
   }
 

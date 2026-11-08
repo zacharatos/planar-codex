@@ -73,14 +73,16 @@ The **Prompter** is a GM-only panel beside the canvas that keeps tonight's impor
    - The body is ordinary Codex Markdown: rolls, links, read-aloud and private lines (with their Whisper buttons) all work on the card.
    - Beats are GM-only, like `[!dm]`. In the note they show ✓ / ✗ buttons and whether they were played.
 
-2. **Start the session** in the panel. The Prompter listens, and when something at the table matches a beat it moves it to **Now**, with a notification (and a chime, if you want one):
+2. **Start the session** in the panel. The Prompter listens, and when something at the table matches a beat it moves it up, with a notification (and a chime, if you want one):
    - **Planar Theater**: a place, an NPC card or a title card shown, on the stage or over the map.
    - **Planar Atlas**: the party arrives at a place; the part of the day changes.
    - A scene activated, a combat ending, a Short or Long Rest (dnd5e), a death (Planar Glitch).
 
-3. **Play** what comes up and tick it: ✓ played, ✗ not tonight, ⏩ later. When every private line on a card has been sent from it, the beat is marked played. The **spotlight** row counts beats, private lines and notes per hero, so you can see who hasn't had a moment yet.
+   The **Now** strip on top (*Τώρα*) shows where the party is (with its place card, if the place has a note), who is here (people Theater just showed, and the place card's regulars), and **at most three cards** for here and now: what the table called for since the party got here, then the cards for this place, these people and this time of day, then the musts. The rest of the deck is folded below.
 
-4. **Notes:** type in the box at the bottom, with tags (`#canon`, `#npc`, `#paid`, `#ruling`, `#quote`, `#loot`, `#hi`, `#idea` or your own). The feed also records what the modules saw: private lines sent and read (Planar Whispers), coins in and out of the common purse and every stop on the road (Planar Atlas), Heroic Inspiration given and used, deaths and returns (Planar Glitch), rests and combats.
+3. **Play** what comes up and tick it: ✓ played, ✗ not tonight, ⏩ later. After a click in the panel, **1 / 2 / 3** play the Now cards, **U** undoes and **R** opens the place card (**Alt+1 / 2 / 3** work anywhere). When every private line on a card has been sent from it, the beat is marked played. The **spotlight** row counts beats, private lines and notes per hero, so you can see who hasn't had a moment yet.
+
+4. **Notes:** type in the box at the bottom, with tags (`#canon`, `#npc`, `#paid`, `#ruling`, `#quote`, `#loot`, `#hi`, `#idea` or your own). A tag chip writes a note in one tap, with the place and the time (and whatever you typed); Shift-click puts the tag in the text instead. The feed also records what the modules saw: private lines sent and read (Planar Whispers), coins in and out of the common purse and every stop on the road (Planar Atlas), Heroic Inspiration given and used, deaths and returns (Planar Glitch), rests and combats.
 
 5. **Close the session.** You answer the numbered questions under a heading called **Close-out** in the run sheet, and the Prompter writes a note **Session NN - live log** (in a `Sessions` folder if the Codex has one): the deck with what was played, skipped or missed (with the next miss count), the spotlight, your notes, the module events and your answers. It exports with the vault like any note.
 
@@ -225,7 +227,7 @@ The page's stored HTML is the player version: `[!dm]`, `[!whisper]` and `[!beat]
 | Lens: follow selected NPC tokens | per computer | Selecting a token no player owns points the Lens at it |
 | Lens: switch to it when the table moves | per computer | Off: the Lens tab only shows a dot when it has something new |
 
-Keybindings: *Configure Controls → Planar Codex → Edit the note here* (Ctrl+E by default), *Prompter: show or hide* (Alt+D), *Prompter: quick note* (Alt+N), *Lens: show* (Alt+L), *Library: open* (Alt+B).
+Keybindings: *Configure Controls → Planar Codex → Edit the note here* (Ctrl+E by default), *Prompter: show or hide* (Alt+D), *Prompter: quick note* (Alt+N), *Prompter: play the 1st / 2nd / 3rd Now card* (Alt+1 / 2 / 3), *Lens: show* (Alt+L), *Library: open* (Alt+B).
 
 ## Contributing and development
 

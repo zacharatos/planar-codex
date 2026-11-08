@@ -111,6 +111,25 @@ export function npcCardNamed(name) {
   return null;
 }
 
+/**
+ * The place card for what the table shows or where the party is (a Theater label, an Atlas stop, a key), with who is there:
+ * `who` the NPC notes its *Ποιοι είναι εδώ* links to, `regulars` every name of those people plus the bold names of people
+ * without a note («**Η Ορκ του Οδοιπόρου**»). For the Prompter's Now strip (0.10). Null when no place note matches.
+ */
+export function placeCardFor(label) {
+  const names = L.namesFromLabel(label);
+  if ( !names.length ) return null;
+  const { notes, variants } = expandQuery(names.join(" · "));
+  if ( !variants.length ) return null;
+  const c = cardsFor(notes.places, "place", variants, label, { inQuery: true })[0];
+  if ( !c ) return null;
+  const body = c.card.by.who?.body ?? "";
+  const who = L.linkTargets(body).map(t => npcCardNamed(t)).filter(Boolean);
+  const bold = [...body.matchAll(/^\s*[-*+]\s+\*\*([^*]+?)\*\*/gm)].map(m => L.stripMd(m[1]).trim()).filter(Boolean);
+  const regulars = [...new Set([...who.flatMap(n => n.names), ...bold])];
+  return { ...c, who, regulars };
+}
+
 /** The name book: glossary rows and people's names. Rebuilt when one of its notes changes. */
 let book = { key: "", value: null };
 function nameBook(notes) {

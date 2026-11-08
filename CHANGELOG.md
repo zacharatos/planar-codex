@@ -3,6 +3,20 @@
 All notable changes to this module. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 The release workflow uses the section matching the tag as the GitHub release notes, so keep the `## [x.y.z]` headings exact.
 
+## [0.10.0]
+
+Codex "Cards", part 4: the Now strip. The two or three cards for here and now, on top of the Prompter.
+
+### Added
+- **The Now strip** (*Τώρα*), under the Prompter's header:
+  - **Where:** the place the table last showed (a Theater place, on its stage or over the map) or reached (an Atlas stop; after a reload, the road's last stop). With a place note (`type: place`), its Greek name; click it, or *Place card*, to open the card in the Lens.
+  - **Who's here:** a chip for each person Theater has shown since the party got there (👁), then the people the place card lists in *Ποιοι είναι εδώ*. Hover: wants and fears; click: their card in the Lens.
+  - **Now:** at most three cards, biggest first: what the table called for since the party got here, then cards whose moments name this place, someone shown, someone who is here, or the time of day (Atlas clock), then the musts. A card called for before the party moved weighs much less; *later* cards sink. Rule cards (they toast), sleeping and done cards never show. Each card says why it's there (hover its number).
+  - The cards in the strip aren't repeated below. *The deck* and *Listen for* fold (the deck starts folded while the strip has cards); what you open or fold stays so while the panel redraws. The old *Now* section is *Also called for*: hot cards beyond the three.
+- **Keys at the table.** After a click in the Prompter: **1 / 2 / 3** play the strip's cards (with the Undo bar), **U** undoes, **R** opens the place card. Not while typing, and not after a click elsewhere, so the hotbar's digits still work. Anywhere: **Alt+1 / 2 / 3** (*Configure Controls*).
+- **One-tap notes.** A tag chip (*✓ paid*, `#canon`, `#npc`, `#quote` …) writes the note at once, with the place and the time; anything typed goes with it. Shift-click adds the tag to the text instead, as before. Every note now keeps where it was taken: the feed shows 📍, the live log «· at …».
+- API: `api.prompter.now()` (the strip's beat ids), `api.prompter.playNow(n)`; `api.prompter.core.nowCards(beats, ctx)` (the pure ranking).
+
 ## [0.9.0]
 
 Codex "Cards", part 3: keys. A note can name a place, a person, an image or a soundscape before it exists, and it starts working the moment the thing is made with the expected name.

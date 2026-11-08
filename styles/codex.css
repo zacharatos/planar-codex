@@ -504,6 +504,24 @@ img.codex-image { max-width: 100%; height: auto; border: none; border-radius: 4p
 .codex-prompter .pr-count { font-weight: 400; opacity: 0.8; }
 .codex-prompter .pr-must h3 { color: var(--pr-must); }
 .codex-prompter .pr-now h3 { color: var(--pr-hot); }
+/* The Now strip (0.10): where the party is, who is here, the two or three cards for it. */
+.codex-prompter .pr-nowstrip { display: flex; flex-direction: column; gap: 7px; margin: 2px 0 4px; padding: 9px; background: #262330; border: 1px solid #4b4466; border-radius: 8px; }
+.codex-prompter .pr-now-title { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #b8b0d9; }
+.codex-prompter .pr-now-keys { margin-left: auto; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--pr-muted); cursor: help; }
+.codex-prompter .pr-now-where { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+.codex-prompter .pr-now-where > i { color: var(--pr-hot); }
+.codex-prompter .pr-now-place { font-weight: 700; font-size: 15px; color: var(--pr-text); cursor: pointer; }
+.codex-prompter .pr-now-from { font-size: 12px; color: var(--pr-muted); }
+.codex-prompter .pr-now-card { margin-left: auto; font-size: 12.5px; color: var(--pr-hot); cursor: pointer; white-space: nowrap; }
+.codex-prompter .pr-now-nowhere { font-size: 12.5px; color: var(--pr-muted); }
+.codex-prompter .pr-now-who { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.codex-prompter .pr-now-lbl { font-size: 12px; color: var(--pr-muted); }
+.codex-prompter .pr-now-npc { flex: 0 0 auto; width: auto; line-height: 1.4; padding: 2px 10px; border-radius: 12px; font-size: 12.5px; background: rgba(95, 158, 143, 0.2); color: #c7ece2; border: 1px solid rgba(95, 158, 143, 0.5); }
+.codex-prompter .pr-now-npc.pr-seen { border-color: #8fd3c1; }
+.codex-prompter .pr-nowstrip .pr-card { margin: 0; background: #1f1d22; }
+.codex-prompter .pr-now-n { flex: 0 0 auto; min-width: 18px; padding: 0 4px; border-radius: 4px; border: 1px solid #6c66c9; background: #2b2a45; color: #d9d6ff; font: 700 11px/16px var(--codex-font); text-align: center; cursor: help; }
+.codex-prompter .pr-note-where { font-size: 11.5px; color: var(--pr-muted); }
+.codex-prompter .pr-tagbtn.pr-tag-paid { color: #c7ece2; }
 .codex-prompter .pr-none { margin: 2px 0 4px; font-size: 12.5px; color: var(--pr-muted); font-style: italic; }
 
 .codex-prompter .pr-card {

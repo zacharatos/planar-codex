@@ -57,6 +57,17 @@ export function initPrompter() {
     onDown: () => { PrompterPanel.note(); return true; }
   });
 
+  // The Now strip's cards from anywhere (in the panel, plain 1 / 2 / 3 work too). Alt, so the hotbar's digits stay the hotbar's.
+  for ( const n of [1, 2, 3] ) {
+    game.keybindings.register(MODULE_ID, `prompterNow${n}`, {
+      name: `PLANARCODEX.Keybindings.PrompterNow${n}`,
+      hint: "PLANARCODEX.Keybindings.PrompterNowHint",
+      editable: [{ key: `Digit${n}`, modifiers: ["Alt"] }],
+      restricted: true,
+      onDown: () => !!PrompterPanel.instance?.rendered && PrompterPanel.instance.playNow(n)
+    });
+  }
+
   setPanelOpener(() => PrompterPanel.open());
   setToastPanelOpener(() => PrompterPanel.open({ tab: "prompter" }));
   registerContextHooks();
@@ -93,6 +104,10 @@ export const prompterApi = {
   beats: () => readSheet(sheetPage())?.beats ?? [],
   run: () => run(),
   played: (id, where = "") => setBeat(id, "played", where),
+  /** The Now strip's cards (0.10): the beat ids in order, as the open panel last drew them ([] when it's closed). */
+  now: () => [...(PrompterPanel.instance?.nowIds ?? [])],
+  /** Play the n-th Now card, as the keys 1 / 2 / 3 do. */
+  playNow: n => PrompterPanel.instance?.playNow(n) ?? false,
   /** A beat's kind: {kind, sure, written, guess} (0.7). */
   kind: idOrBeat => kindInfo(typeof idOrBeat === "string" ? (readSheet(sheetPage())?.beats ?? []).find(b => b.id === idOrBeat) : idOrBeat),
   core

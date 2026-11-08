@@ -31,7 +31,34 @@ const hot = new Map();
 const recent = [];
 const lastHeard = new Map();
 
+/** Where the party is, as the table last showed it (a Theater place, an Atlas stop): {text, label, t}. In memory only. */
+let here = null;
+/** People the table has shown since (Theater NPC cards): [{text, t}], newest first. */
+const seen = [];
+const SEEN_MINUTES = 45;
+
 export const hotBeats = () => hot;
+
+/**
+ * Where the party is now: the last place the table showed, or after a reload the Atlas road's last stop,
+ * or what Theater has over the map. {text, label, t} or null.
+ */
+export function herePlace() {
+  if ( here ) return here;
+  const atlas = api("planar-atlas");
+  const stop = activeStops(atlas).at(-1);
+  if ( stop?.label ) return { text: stop.label, label: localize("Prompter.Source.Atlas"), t: stop.date ?? null };
+  const ov = api("planar-theater")?.overlay?.()?.place;
+  if ( ov?.label ) return { text: ov.label, label: localize("Prompter.Source.Theater"), t: null };
+  return null;
+}
+
+/** The people the table has shown since the party got here (and in the last 45 minutes), newest first. */
+export function seenPeople() {
+  const since = here?.t ?? null;
+  const cutoff = new Date(Date.now() - SEEN_MINUTES * 60000).toISOString();
+  return seen.filter(p => p.t >= cutoff && (!since || p.t >= since)).map(p => p.text);
+}
 export const recentContexts = () => recent;
 export function cool(id) { if ( hot.delete(id) ) refresh(); }
 
@@ -50,6 +77,17 @@ export function hear(context, { label = "", quiet = false } = {}) {
   lastHeard.set(key, now);
   recent.unshift({ ...context, label, t: new Date().toISOString() });
   recent.length = Math.min(recent.length, 8);
+  // The Now strip follows the party: a place shown or reached is "here"; people shown are "here" until it changes.
+  if ( context.kind === "place" && context.text ) {
+    if ( here?.text !== context.text ) seen.length = 0;
+    here = { text: context.text, label, t: recent[0].t };
+  }
+  else if ( context.kind === "npc" && context.text ) {
+    const i = seen.findIndex(p => p.text === context.text);
+    if ( i >= 0 ) seen.splice(i, 1);
+    seen.unshift({ text: context.text, t: recent[0].t });
+    seen.length = Math.min(seen.length, 6);
+  }
 
   const page = sheetPage();
   const sheet = readSheet(page);

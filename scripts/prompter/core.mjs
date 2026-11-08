@@ -263,6 +263,58 @@ export function beatsFor(beats, context, status = {}, expand = t => [t]) {
   return beats.filter(b => !["played", "skipped"].includes(status[b.id]?.s) && b.at.some(t => expand(t).some(x => triggerMatches(x, context))));
 }
 
+/* -------------------------------------------- */
+/*  The Now strip (0.10)                        */
+/* -------------------------------------------- */
+
+/** How much each reason weighs in the Now strip (biggest first). */
+export const NOW_WEIGHTS = { hot: 100, hotBefore: 15, here: 60, person: 40, regular: 30, time: 25, must: 20, should: 10, fit: 5, watch: 0, extra: 5, later: -30 };
+
+/**
+ * The two or three cards for here and now (§ 3.3 of the plan): what the table called for since the party got here,
+ * then cards whose moments name this place, the people here or the time of day, then the musts. Rule cards (toasts),
+ * sleeping and done cards never show.
+ * @param {object[]} beats                   parseBeats() output
+ * @param {object} ctx
+ * @param {object} [ctx.status]              beat id → {s}
+ * @param {Map<string, {t: string}>} [ctx.hot]  what the table called for
+ * @param {string[]} [ctx.places]            every name of where the party is (note names, Theater labels, the Atlas name)
+ * @param {string|null} [ctx.since]          when the party got there (ISO): older hot cards weigh less
+ * @param {string[]} [ctx.people]            people the table has just seen (Theater NPC cards)
+ * @param {string[]} [ctx.regulars]          people the place's card says are here
+ * @param {string} [ctx.band]                part of the day (Atlas clock)
+ * @param {(beat) => boolean} [ctx.asleep]
+ * @param {(beat) => string} [ctx.kindOf]
+ * @param {(trigger: string) => string[]} [ctx.expand]
+ * @param {number} [ctx.max=3]
+ * @returns {{beat: object, score: number, why: string}[]}  why: hot | here | person | regular | time | must
+ */
+export function nowCards(beats, ctx = {}) {
+  const { status = {}, hot = new Map(), places = [], since = null, people = [], regulars = [], band = "",
+    asleep = () => false, kindOf = () => "story", expand = t => [t], max = 3 } = ctx;
+  const W = NOW_WEIGHTS;
+  const out = [];
+  for ( const b of beats ) {
+    const st = status[b.id]?.s;
+    if ( ["played", "skipped"].includes(st) || kindOf(b) === "rule" || asleep(b) ) continue;
+    const names = b.at.flatMap(t => expand(t));
+    const hits = (kind, list) => list.some(text => names.some(x => triggerMatches(x, { kind, text })));
+    const reasons = [];
+    const h = hot.get(b.id);
+    if ( h ) reasons.push(["hot", !since || !h.t || h.t >= since ? W.hot : W.hotBefore]);
+    if ( hits("place", places) ) reasons.push(["here", W.here]);
+    if ( hits("npc", people) ) reasons.push(["person", W.person]);
+    else if ( hits("npc", regulars) ) reasons.push(["regular", W.regular]);
+    if ( band && names.some(x => triggerMatches(x, { kind: "time", text: band })) ) reasons.push(["time", W.time]);
+    if ( !reasons.length && b.priority !== "must" ) continue;
+    reasons.sort((a, c) => c[1] - a[1]);
+    const why = reasons[0]?.[0] ?? "must";
+    const score = (reasons[0]?.[1] ?? 0) + (reasons.length - 1) * W.extra + (W[b.priority] ?? 0) + (st === "later" ? W.later : 0);
+    out.push({ beat: b, score, why });
+  }
+  return out.sort((a, c) => c.score - a.score || a.beat.order - c.beat.order).slice(0, max);
+}
+
 /** Is a beat asleep: it names heroes and none of them is at the table? */
 export function isAsleep(beat, present) {
   if ( !beat.pc.length || !present ) return false;
@@ -498,7 +550,7 @@ export function buildLiveLog({ sheetName, session, beats, state, questions = [],
 
   const notes = st.notes ?? [];
   lines.push("## Notes from the table", "");
-  if ( notes.length ) for ( const n of notes ) lines.push(`- ${hhmm(n.t)} ${n.tags.map(t => `\`#${t}\``).join(" ")} ${n.text}`.replace(/\s+$/, ""));
+  if ( notes.length ) for ( const n of notes ) lines.push(`- ${hhmm(n.t)} ${n.tags.map(t => `\`#${t}\``).join(" ")} ${n.text}${n.where ? ` · at ${n.where}` : ""}`.replace(/\s+/g, " ").trimEnd());
   else lines.push("- *(none)*");
   lines.push("");
 

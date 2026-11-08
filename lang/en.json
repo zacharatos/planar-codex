@@ -149,7 +149,11 @@
       "Lens": "Lens: show",
       "LensHint": "Open the GM console on the Lens, with the cursor in its search box.",
       "Library": "Library: open",
-      "LibraryHint": "Open the Library (the books imported into this world)."
+      "LibraryHint": "Open the Library (the books imported into this world).",
+      "PrompterNow1": "Prompter: play the 1st Now card",
+      "PrompterNow2": "Prompter: play the 2nd Now card",
+      "PrompterNow3": "Prompter: play the 3rd Now card",
+      "PrompterNowHint": "Mark that card of the Now strip as played (with Undo), while the Prompter is open. In the panel, plain 1 / 2 / 3 do the same, U undoes and R opens the place card."
     },
     "Editor": {
       "Done": "Done",
@@ -217,7 +221,7 @@
       "CloseOk": "Close and write the log",
       "Section": {
         "Must": "Never forget",
-        "Now": "Now",
+        "Now": "Also called for",
         "Deck": "The deck",
         "Watch": "Listen for",
         "Sleeping": "Waiting for absent heroes",
@@ -306,7 +310,30 @@
       "RuleShow": "Show this rule now",
       "RuleDismiss": "Dismiss",
       "RuleByHand": "by hand",
-      "RemindedTip": "Reminded tonight: {times}"
+      "RemindedTip": "Reminded tonight: {times}",
+      "NowStrip": {
+        "Title": "Now",
+        "Here": "Here:",
+        "PlaceCard": "Place card",
+        "Lens": "Lens",
+        "PlaceTip": "Open the place card of {name} in the Lens (R)",
+        "NoCardTip": "No place note for {name} yet: the Lens shows what the notes know (R)",
+        "Nowhere": "Where is the party? Show a place on Theater or move on the Atlas.",
+        "OnStage": "just shown on Theater",
+        "Empty": "Nothing for here and now: the deck is below.",
+        "KeysTip": "1 / 2 / 3 play these cards (Alt+1 / 2 / 3 anywhere) · U undo · R the place card",
+        "Why": {
+          "hot": "Called for by the table",
+          "here": "For this place",
+          "person": "For someone on stage",
+          "regular": "For someone who is here",
+          "time": "For this time of day",
+          "must": "Must happen tonight"
+        }
+      },
+      "QuickPaid": "✓ paid",
+      "QuickTip": "Click: note it now, with the place and the time (and anything typed). Shift-click: add the tag to the text.",
+      "QuickSaved": "Noted {tag} · {where}"
     },
     "Lens": {
       "Title": "Lens",
