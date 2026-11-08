@@ -20,7 +20,7 @@ tags: [prep, run-sheet]
 >
 > Not ruled by now → the recommendation stands.
 
-> [!beat|should|at=The Old Library; the archivist; any official paper|pc=Brannoc, Ilsa|ledger=8,53|missed=1] The forged deed: blank cause, "33", two names
+> [!beat|should|kind=clue|at=The Old Library; the archivist; any official paper|pc=Brannoc, Ilsa|ledger=8,53|missed=1] The forged deed: blank cause, "33", two names
 >
 > Search [[/check ability=int skill=inv dc=18]] or pay the archivist 5 gp.
 
@@ -37,6 +37,14 @@ tags: [prep, run-sheet]
 > [!beat|watch|at=Mara plays the lullaby|pc=Brannoc|ledger=46|missed=1] Brannoc's lullaby line
 
 > [!beat|fit|pc=Elsewhere|ledger=38] The bell rings for the absent hero
+
+> [!beat|watch|at=Short Rest|pc=Brannoc] Rule: Brannoc's bad knee
+>
+> - **Any Short Rest:** [[/check ability=con dc=12]] or no Hit Point Dice.
+
+> [!beat|fit|at=Short Rest; The Old Library] Dust in the stacks
+>
+> [[/check ability=con dc=10]] or cough through the next scene.
 
 ## ✅ Close-out
 

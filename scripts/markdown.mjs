@@ -529,7 +529,11 @@ function postProcess(root, { gm, revealed, notePath }) {
 
     const aside = doc.createElement(info.fold ? "details" : "aside");
     aside.className = `codex-callout codex-callout-${kind}`;
-    if ( kind === "beat" ) aside.classList.add(`codex-beat-${parseBeatMeta(info.meta).priority}`);
+    if ( kind === "beat" ) {
+      const m = parseBeatMeta(info.meta);
+      aside.classList.add(`codex-beat-${m.priority}`);
+      if ( m.kind ) aside.classList.add(`codex-beat-kind-${m.kind}`);
+    }
     aside.dataset.callout = kind;
     if ( bq.dataset.codexLine ) aside.dataset.codexLine = bq.dataset.codexLine;
     if ( info.title ) aside.dataset.title = info.titleText;

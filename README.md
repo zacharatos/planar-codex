@@ -68,6 +68,8 @@ The **Prompter** is a GM-only panel beside the canvas that keeps tonight's impor
    - `at=`: the moments to play it, separated by `;`. Names (a place, an NPC, a scene, a part of the day) and the moments `session start`, `table open`, `Long Rest`, `Short Rest`, `after combat`, `death`, `night`. Moments like "any meal" are shown but never matched automatically.
    - `pc=`: the heroes it is for. When none of them is played by someone logged in, the beat sleeps.
    - `ledger=` and `missed=`: your own numbering, shown on the card.
+   - `kind=`: what the card is, so you can tell them apart at a glance and filter: `story` (a scene), `clue` (found / not found), `whisper` (sent), `npc` (opens the person in the Lens), `event`, or `rule`. Leave it out and the Prompter guesses (a title like «Rule: …» counts); click a card's badge to change it, and the choice is written back into the note.
+   - **Rule cards** (`kind=rule`, e.g. `> [!beat|watch|kind=rule|at=Short Rest|pc=Lothrik] Rule: Poisoned Roots`) are reminders: at their moment a box with the rule and its rolls appears at the top of the screen until you dismiss it. They stay in the deck under *Rules*, and are never "missed".
    - The body is ordinary Codex Markdown: rolls, links, read-aloud and private lines (with their Whisper buttons) all work on the card.
    - Beats are GM-only, like `[!dm]`. In the note they show ✓ / ✗ buttons and whether they were played.
 
@@ -145,6 +147,7 @@ Import the books you own once, and every book citation in your notes (`` `ToFW, 
 | … with [Planar Whispers](https://github.com/zacharatos/planar-whispers): full screen, a style, burn after reading, sent together | `> [!whisper\|voice\|burn] Ilsa`, `> [!whisper\|memory\|together=song] Ilsa` |
 | GM-only box (never sent to players) | `> [!dm] Optional title` then `> text` |
 | A beat for the Prompter (GM only) | `> [!beat\|must\|at=place; first Long Rest\|pc=Ilsa\|ledger=4] Title` then `> body` |
+| A rule reminder (GM only) | `> [!beat\|watch\|kind=rule\|at=Short Rest\|pc=Ilsa] Rule: …` then `> the rule, with its roll` |
 | Secret (revealable) | `> [!secret]` then `> text` |
 | GM-only aside | `%%like this%%` |
 | Highlight | `==text==` |

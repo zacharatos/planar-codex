@@ -7,8 +7,10 @@
  * Everything here runs only in the active GM's browser. Modules that aren't installed are simply never heard from.
  */
 import { MODULE_ID, localize } from "../codex.mjs";
-import { beatsFor, olderThan } from "./core.mjs";
+import { beatsFor, olderThan, plainTitle } from "./core.mjs";
 import { sheetPage, readSheet, run, asleep, addEvent, mutateRun, refresh } from "./state.mjs";
+import { kindOf } from "./kinds.mjs";
+import { showRuleToast } from "./toasts.mjs";
 
 /** Only one GM browser listens and logs (the active GM). The panel says so in the others. */
 export const isActiveGM = () => !!game.user?.isGM && (game.users.activeGM?.id ?? game.user.id) === game.user.id;
@@ -52,7 +54,15 @@ export function hear(context, { label = "", quiet = false } = {}) {
   const sheet = readSheet(page);
   if ( !sheet ) { refresh(); return []; }
   const where = [label, context.text].filter(Boolean).join(" · ");
-  const found = beatsFor(sheet.beats, context, run(page).beats).filter(b => !asleep(b) && !hot.has(b.id));
+  const matched = beatsFor(sheet.beats, context, run(page).beats).filter(b => !asleep(b));
+  // Rule cards are reminders, not beats: a toast with the rule at its moment (every time), logged as "reminded".
+  const rules = matched.filter(b => kindOf(b) === "rule");
+  for ( const b of rules ) {
+    showRuleToast(b, page, where);
+    addEvent("rule", localize("Prompter.Kind.rule"), localize("Prompter.Event.Reminded", { title: plainTitle(b.title), where: where || "—" }), page,
+      { ref: `rule:${b.id}:${Date.now()}`, beat: b.id });
+  }
+  const found = matched.filter(b => !rules.includes(b) && !hot.has(b.id));
   for ( const b of found ) hot.set(b.id, { t: new Date().toISOString(), where });
   if ( found.length && !quiet && game.settings.get(MODULE_ID, "prompterToasts") ) {
     ui.notifications.info(localize("Prompter.Toast", { titles: found.map(b => b.title).join(" · "), where: where || "—" }));
@@ -61,7 +71,7 @@ export function hear(context, { label = "", quiet = false } = {}) {
     }
   }
   refresh();
-  return found;
+  return [...rules, ...found];
 }
 
 /* -------------------------------------------- */

@@ -13,9 +13,24 @@
  *   ledger  ledger numbers, separated by `,`
  *   missed  how many sessions it has already been missed
  *   id      a stable id (otherwise made from the title)
+ *   kind    story, clue, whisper, rule, npc or event (otherwise guessed: see inferKind)
  */
 
 export const PRIORITIES = ["must", "should", "fit", "watch"];
+
+/** Card kinds (0.7), in the order of the filter chips. */
+export const KINDS = ["story", "clue", "whisper", "npc", "event", "rule"];
+export const KIND_ICONS = { story: "🎭", clue: "🔍", whisper: "🤫", rule: "⚖", npc: "👤", event: "⚡" };
+const KIND_ALIASES = {
+  story: "story", scene: "story", beat: "story", σκηνη: "story",
+  clue: "clue", στοιχειο: "clue", evidence: "clue",
+  whisper: "whisper", ψιθυροσ: "whisper", private: "whisper",
+  rule: "rule", ruling: "rule", rules: "rule", κανονασ: "rule", κανονεσ: "rule",
+  npc: "npc", person: "npc", people: "npc", προσωπο: "npc",
+  event: "event", γεγονοσ: "event", happening: "event"
+};
+/** A written kind ("Κανόνας", "ruling", "clue") → one of KINDS, or null. */
+export const kindName = word => KIND_ALIASES[fold(word)] ?? null;
 const PRIORITY_ALIASES = {
   must: "must", red: "must", gate: "must", critical: "must",
   should: "should", yellow: "should",
@@ -59,12 +74,13 @@ const splitList = (value, sep) => String(value ?? "").split(sep).map(s => s.trim
 
 /** Callout options (`must|at=…|pc=…`) → beat fields. */
 export function parseBeatMeta(meta) {
-  const out = { priority: "should", at: [], pc: [], ledger: [], missed: 0, id: null };
+  const out = { priority: "should", at: [], pc: [], ledger: [], missed: 0, id: null, kind: null, kindRaw: null };
   for ( const part of String(meta ?? "").split("|").map(s => s.trim()).filter(Boolean) ) {
     const eq = part.indexOf("=");
     if ( eq < 0 ) {
       const p = PRIORITY_ALIASES[part.toLowerCase()];
       if ( p ) out.priority = p;
+      else if ( kindName(part) ) out.kind = kindName(part);
       continue;
     }
     const key = part.slice(0, eq).trim().toLowerCase();
@@ -75,8 +91,29 @@ export function parseBeatMeta(meta) {
     else if ( key === "missed" ) out.missed = Math.max(0, parseInt(value, 10) || 0);
     else if ( key === "id" ) out.id = value || null;
     else if ( ["priority", "p"].includes(key) ) out.priority = PRIORITY_ALIASES[value.toLowerCase()] ?? out.priority;
+    else if ( ["kind", "type", "k"].includes(key) ) { out.kindRaw = value; out.kind = kindName(value); }
   }
   return out;
+}
+
+/**
+ * Write (or replace) `kind=` on the beat callout that starts at a line. Everything else on the line stays as it is.
+ * @param {string} markdown
+ * @param {number} line   the beat's `line` (parseBeats)
+ * @param {string} kind   one of KINDS
+ * @returns {string|null} the new Markdown, or null when that line isn't a beat callout
+ */
+export function setBeatKind(markdown, line, kind) {
+  const eol = /\r\n/.test(markdown) ? "\r\n" : "\n";
+  const lines = String(markdown ?? "").split(/\r?\n/);
+  const m = lines[line]?.match(/^(>[ \t]?\[!beat)((?:\|[^\]]*)?)(\][+-]?.*)$/i);
+  if ( !m || !KINDS.includes(kind) ) return null;
+  const parts = m[2].split("|").slice(1).filter(p => !/^\s*(kind|type|k)\s*=/i.test(p) && !(p.indexOf("=") < 0 && kindName(p)));
+  // After the priority (if any), before the other options.
+  const at = parts.length && parts[0].indexOf("=") < 0 ? 1 : 0;
+  parts.splice(at, 0, `kind=${kind}`);
+  lines[line] = `${m[1]}|${parts.join("|")}${m[3]}`;
+  return lines.join(eol);
 }
 
 const BEAT_HEAD = /^>[ \t]?\[!beat(?:\|([^\]]*))?\][+-]?[ \t]*(.*)$/i;
@@ -242,6 +279,77 @@ export function isNight(band) {
 }
 
 /* -------------------------------------------- */
+/*  Card kinds                                  */
+/* -------------------------------------------- */
+
+/** The moments a rule card waits for: rests, the end of a fight, a death. */
+const RULE_MOMENTS = [{ kind: "rest", long: true }, { kind: "rest", long: false }, { kind: "combat" }, { kind: "death" }];
+const isRuleMoment = t => RULE_MOMENTS.some(c => triggerMatches(t, c));
+const TIME_WORDS = ["morning", "noon", "afternoon", "evening", "dusk", "dawn", "night", "midnight", "peak", "antipeak",
+  "πρωι", "μεσημερι", "απογευμα", "βραδυ", "σουρουπο", "αυγη", "νυχτα", "μεσανυχτα", "ζενιθ", "αντιζενιθ"];
+const isTimeMoment = t => {
+  const f = fold(t).replace(/^(at|in the|in|the|any|every|each|στο|στη|στην|το|η|καθε)\s+/, "");
+  return /^(whenever|οποτε)/.test(fold(t)) || TIME_WORDS.some(w => f === w || f.startsWith(`${w} `) || f.endsWith(` ${w}`));
+};
+const ROLL = /\[\[\/(check|save|skill|tool|roll|r|damage|attack|heal|request)\b/i;
+const CITATION = /\b(PHB|DMG|MM|XGE|TCE)\b[^`\n]*›|\[HB(?: ruling)?\]|\bruling\b|κανόνας|κανονας/i;
+const CLUE_WORD = /\bclues?\b|\bevidence\b|στοιχεί[οα]|στοιχει[οα]|ενδείξ|ενδειξ/i;
+const TITLE_KIND = /^\s*(rule|ruling|κανόνας|κανονας|clue|στοιχείο|στοιχειο|whisper|ψίθυρος|ψιθυρος|event|γεγονός|γεγονος|npc|πρόσωπο|προσωπο)\s*[:·—–-]\s*/i;
+
+/** A title without its kind prefix: «Rule: Poisoned Roots» → «Poisoned Roots» (for toasts and the log, which show the kind). */
+export const plainTitle = title => String(title ?? "").replace(TITLE_KIND, "") || String(title ?? "");
+
+/** Is a body nothing but private-line callouts (`> [!whisper] Name` blocks)? */
+function onlyWhispers(body) {
+  const lines = String(body ?? "").split("\n").filter(l => l.trim());
+  if ( !lines.length ) return false;
+  let inWhisper = false;
+  for ( const l of lines ) {
+    if ( /^>[ \t]?\[!whisper\b/i.test(l) ) { inWhisper = true; continue; }
+    if ( /^>/.test(l) && inWhisper ) continue;
+    return false;
+  }
+  return true;
+}
+
+/**
+ * What kind of card a beat is: the written `kind=` wins, otherwise a guess.
+ *  title «Rule: …», «Κανόνας: …», «Clue: …» …          → that kind
+ *  the body is only private lines                       → whisper
+ *  every moment is a rest / end of combat / a death, and the body has a roll or a rule citation → rule
+ *  the body has a check and says clue / στοιχείο        → clue
+ *  every moment is a person (`isPerson`)                → npc
+ *  every moment is a time of day, or «whenever …»       → event
+ *  otherwise                                            → story
+ * `sure` is false when the card could be read two ways (a roll with a rest *and* places to wait for: rule or story?):
+ * the Prompter then asks «Τι είδος;», and the ready check says "kind unclear".
+ * @param {{kind?: string|null, title: string, at: string[], body: string}} beat
+ * @param {{isPerson?: (name: string) => boolean}} [options]
+ * @returns {{kind: string, sure: boolean, written: boolean, guess: string}}  guess = what it reads like, written or not
+ */
+export function inferKind(beat, { isPerson = () => false } = {}) {
+  const body = String(beat?.body ?? "");
+  const at = (beat?.at ?? []).filter(t => !isKindOfMoment(t) || isTimeMoment(t));
+  const all = beat?.at ?? [];
+  let guess = "story";
+  let sure = true;
+  const titled = String(beat?.title ?? "").match(TITLE_KIND);
+  const hasRoll = ROLL.test(body);
+  if ( titled ) guess = kindName(titled[1]) ?? "story";
+  else if ( onlyWhispers(body) ) guess = "whisper";
+  else if ( all.length && all.some(isRuleMoment) && (hasRoll || CITATION.test(body)) ) {
+    // Only rests, fights and deaths: a rule. Also places or people: it could be a story that rests come up in.
+    if ( all.every(t => isRuleMoment(t) || isKindOfMoment(t)) ) guess = "rule";
+    else sure = false;
+  }
+  else if ( hasRoll && CLUE_WORD.test(body) ) guess = "clue";
+  else if ( all.length && all.every(t => isPerson(t)) ) guess = "npc";
+  else if ( at.length && at.every(isTimeMoment) ) guess = "event";
+  const written = !!beat?.kind && KINDS.includes(beat.kind);
+  return { kind: written ? beat.kind : guess, sure: written || sure, written, guess };
+}
+
+/* -------------------------------------------- */
 /*  Time at the table                           */
 /* -------------------------------------------- */
 
@@ -336,8 +444,9 @@ export function duration(ms) {
  * @param {(beat) => boolean} [data.asleep]
  * @param {(beat) => string[]} [data.absent]  the heroes a sleeping beat waits for
  * @param {{name: string, count: number, present: boolean}[]} [data.spotlight]
+ * @param {(beat) => string} [data.kindOf]   the card's kind (KINDS); rule cards log when they reminded, never "missed"
  */
-export function buildLiveLog({ sheetName, session, beats, state, questions = [], asleep = () => false, absent = () => [], spotlight = [] }) {
+export function buildLiveLog({ sheetName, session, beats, state, questions = [], asleep = () => false, absent = () => [], spotlight = [], kindOf = () => "story" }) {
   const st = state ?? {};
   const status = st.beats ?? {};
   const nn = pad2(session);
@@ -361,17 +470,22 @@ export function buildLiveLog({ sheetName, session, beats, state, questions = [],
   const played = beats.filter(b => status[b.id]?.s === "played");
   const skipped = beats.filter(b => status[b.id]?.s === "skipped");
   const open = beats.filter(b => !["played", "skipped"].includes(status[b.id]?.s));
-  const row = (b, mark, extra = "") => `| ${mark} | ${PRIORITY_MARK[b.priority] ?? ""} | ${cell(b.title)} | ${cell(b.ledger.map(n => `#${n}`).join(" "))} | ${cell(extra)} |`;
+  const icon = b => { const k = kindOf(b); return k && k !== "story" && KIND_ICONS[k] ? `${KIND_ICONS[k]} ` : ""; };
+  const row = (b, mark, extra = "") => `| ${mark} | ${PRIORITY_MARK[b.priority] ?? ""} | ${icon(b)}${cell(b.title)} | ${cell(b.ledger.map(n => `#${n}`).join(" "))} | ${cell(extra)} |`;
+  const reminded = id => (st.events ?? []).filter(e => e.kind === "rule" && e.beat === id).map(e => hhmm(e.t)).filter(Boolean);
   lines.push("## The deck", "", "| | | Beat | Ledger | When / note |", "|---|---|---|---|---|");
   for ( const b of played ) lines.push(row(b, "✓", [hhmm(status[b.id].t), status[b.id].where].filter(Boolean).join(" · ")));
   for ( const b of skipped ) lines.push(row(b, "✗", `skipped ${hhmm(status[b.id].t)}`));
   for ( const b of open ) {
     const sleeping = asleep(b);
     const who = sleeping ? absent(b) : [];
+    const isRule = kindOf(b) === "rule";
+    const times = isRule ? reminded(b.id) : [];
     const note = sleeping ? `💤 ${who.length ? who.join(", ") : "hero"} absent (not counted)`
-      : b.priority === "watch" ? "not heard tonight (stays in the deck)"
-        : `**not played → missed ×${b.missed + 1}**`;
-    lines.push(row(b, sleeping ? "💤" : "☐", note));
+      : isRule ? (times.length ? `reminded ${times.join(", ")}` : "rule: not needed tonight (stays in the deck)")
+        : b.priority === "watch" ? "not heard tonight (stays in the deck)"
+          : `**not played → missed ×${b.missed + 1}**`;
+    lines.push(row(b, sleeping ? "💤" : isRule ? (times.length ? "⚖" : "·") : "☐", note));
   }
   lines.push("");
 

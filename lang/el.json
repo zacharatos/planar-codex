@@ -222,7 +222,8 @@
         "Watch": "Άκου για",
         "Sleeping": "Περιμένουν ήρωες που λείπουν",
         "Done": "Έγιναν απόψε",
-        "Feed": "Σημειώσεις και ό,τι είδαν τα modules"
+        "Feed": "Σημειώσεις και ό,τι είδαν τα modules",
+        "Rules": "Κανόνες"
       },
       "Source": {
         "Theater": "Θέατρο",
@@ -252,7 +253,8 @@
         "Day": "Μέρα {day}",
         "GMLongRest": "Long Rest (ο GM)",
         "GMShortRest": "Short Rest (ο GM)",
-        "Joined": "{name}: ήρθε στο τραπέζι"
+        "Joined": "{name}: ήρθε στο τραπέζι",
+        "Reminded": "{title} ({where})"
       },
       "LongRest": "Long Rest",
       "ShortRest": "Short Rest",
@@ -271,7 +273,40 @@
       "NudgeIdle": "Τίποτα εδώ και {min} λεπτά. Τέλος της βραδιάς;",
       "NotYet": "Όχι ακόμα",
       "CloseAsOf": "Κλείσιμο στις {time}, το τελευταίο που έγινε στο τραπέζι (όχι τώρα)",
-      "Somewhere": "κάπου στον χάρτη"
+      "Somewhere": "κάπου στον χάρτη",
+      "Kind": {
+        "story": "Σκηνή",
+        "clue": "Στοιχείο",
+        "whisper": "Ψίθυρος",
+        "npc": "Πρόσωπο",
+        "event": "Γεγονός",
+        "rule": "Κανόνας"
+      },
+      "Kinds": {
+        "all": "Όλα",
+        "story": "Σκηνές",
+        "clue": "Στοιχεία",
+        "whisper": "Ψίθυροι",
+        "npc": "Πρόσωπα",
+        "event": "Γεγονότα",
+        "rule": "Κανόνες"
+      },
+      "KindFilter": "Δείξε κάρτες ενός είδους",
+      "KindAsk": "Τι είδος;",
+      "KindChange": "Είδος:",
+      "KindGuessTip": "{kind} (εκτίμηση). Κλικ για αλλαγή",
+      "KindWrittenTip": "{kind}. Κλικ για αλλαγή",
+      "KindSaved": "Η «{title}» είναι τώρα κάρτα: {kind} (γράφτηκε στο run sheet)",
+      "KindNotSaved": "Δεν γράφτηκε το είδος στο run sheet: διόρθωσε τη γραμμή της κάρτας με το χέρι (kind=…)",
+      "FilterEmpty": "Καμία κάρτα αυτού του είδους στην αποψινή τράπουλα.",
+      "Found": "Βρέθηκε",
+      "NotFound": "Δεν βρέθηκε",
+      "Sent": "Στάλθηκε",
+      "OpenLens": "Άνοιξε {name} στον Φακό",
+      "RuleShow": "Δείξε τον κανόνα τώρα",
+      "RuleDismiss": "Κλείσιμο",
+      "RuleByHand": "με το χέρι",
+      "RemindedTip": "Υπενθυμίστηκε απόψε: {times}"
     },
     "Lens": {
       "Title": "Φακός",

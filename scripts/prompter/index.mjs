@@ -8,6 +8,8 @@ import { registerState, sheetPage, readSheet, run, setBeat, addNote, flush } fro
 import { registerContextHooks, primeContext, hear } from "./context.mjs";
 import { PrompterPanel, startSession, closeSession, writeLiveLog } from "./panel.mjs";
 import { setPanelOpener, watchBeatBoxes } from "./beats-in-note.mjs";
+import { setToastPanelOpener } from "./toasts.mjs";
+import { kindInfo, FILTER_SETTING } from "./kinds.mjs";
 
 export function initPrompter() {
   registerState();
@@ -24,6 +26,8 @@ export function initPrompter() {
     name: "PLANARCODEX.Settings.PrompterWhisperPlays", hint: "PLANARCODEX.Settings.PrompterWhisperPlaysHint",
     scope: "world", config: true, type: Boolean, default: true
   });
+  // The filter chip the GM last picked (Όλα, Σκηνές, Στοιχεία …): per GM user, not per browser.
+  register(FILTER_SETTING, { scope: "user", config: false, type: String, default: "all", onChange: () => PrompterPanel.instance?.renderSoon() });
   register("prompterAutoOpen", {
     name: "PLANARCODEX.Settings.PrompterAutoOpen", hint: "PLANARCODEX.Settings.PrompterAutoOpenHint",
     scope: "client", config: true, type: Boolean, default: true
@@ -52,6 +56,7 @@ export function initPrompter() {
   });
 
   setPanelOpener(() => PrompterPanel.open());
+  setToastPanelOpener(() => PrompterPanel.open({ tab: "prompter" }));
   registerContextHooks();
 
   Hooks.on("getSceneControlButtons", controls => {
@@ -86,5 +91,7 @@ export const prompterApi = {
   beats: () => readSheet(sheetPage())?.beats ?? [],
   run: () => run(),
   played: (id, where = "") => setBeat(id, "played", where),
+  /** A beat's kind: {kind, sure, written, guess} (0.7). */
+  kind: idOrBeat => kindInfo(typeof idOrBeat === "string" ? (readSheet(sheetPage())?.beats ?? []).find(b => b.id === idOrBeat) : idOrBeat),
   core
 };

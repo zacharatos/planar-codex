@@ -25,10 +25,12 @@ scripts/
   notes.mjs              create notes, the Codex root folder
   zip.mjs                tiny ZIP writer used by the exporter
   prompter/
-    core.mjs             pure: parse beats and close-out questions, match triggers, notes, the live log Markdown (unit-tested)
+    core.mjs             pure: parse beats and close-out questions, match triggers, card kinds (inferKind, setBeatKind), notes, the live log Markdown (unit-tested)
     state.mjs            the `prompter` world setting (current run sheet, one run per sheet), coalesced writes, who is present, spotlight
     context.mjs          hooks: Theater, Atlas, Whispers, Glitch, scenes, rests, combat, inspiration → hot beats and events
     panel.mjs            the GM panel (ApplicationV2), Start / Close, writing the live log, jump to a beat in the sheet
+    kinds.mjs            card kinds in Foundry: the guess with who is a person (lens/data.mjs), the GM's filter chip, writing kind= back to the sheet
+    toasts.mjs           rule toasts: a rule card's box at the top of the screen when its moment comes (GM only)
     beats-in-note.mjs    state and buttons on beat callouts in the reading view
     index.mjs            settings, keybindings, toolbar button, the `api.prompter` object
   lens/
@@ -144,6 +146,10 @@ Prompter (harness first: `npm run harness`, then /test/harness/prompter.html; `w
 - After a Long Rest (or 30 min with nothing at the table, kept running), a banner offers *Close*; *Not yet* hides it until something new happens.
 - Close more than 45 min after the last event: the dialog offers "Close as of <time>" (ticked); the log's *Closed* and *Played* use that time; *Last at the table* shows it.
 - Notes with tags; delete one. The feed shows whispers sent and read, purse changes, stops, Heroic Inspiration, deaths.
+- **Kinds (0.7):** each card has a coloured badge (dashed = guessed). The harness sheet: *The forged deed* is a clue (🔍, found / not found), *Night whispers* a whisper, *Rule: Brannoc's bad knee* sits in the folded *Rules* section, *Dust in the stacks* shows «What kind?». Pick *Rule* there: the run sheet's line gets `kind=rule` (open the note) and the card moves to *Rules*.
+- Filter chips: each one shows only its kind in every section; click it again (or *All*) to see everything. Reload: the chip is remembered (per GM user).
+- **Rule toasts:** Start, then *Short Rest*: a green box at the top of the screen shows Brannoc's rule with its roll button; the roll works; ✕ dismisses it; the scroll button opens the Prompter. A second Short Rest a minute later shows it again (one box, not two). With Brannoc switched out in the spotlight, nothing shows. The feed and the live log say "reminded"; rule cards are never "missed" and don't block Close.
+- A person card (all its moments are people from the NPC notes, NPC actors or Theater cards): the 👤 button opens that person in the Lens.
 - Close: the dialog asks the close-out questions; a *Session NN - live log* note appears (in *Sessions* if there is one) and opens. Write it again from the header button: the same note is updated.
 - As a player: no toolbar button, no beat boxes in any note, Alt+D does nothing.
 

@@ -79,6 +79,32 @@ function nameBook(notes) {
   return book.value;
 }
 
+/**
+ * Is a name (an `at=` moment) a person the notes or the table know? People in NPC notes and tagged notes,
+ * `type: npc` notes (name and aliases), NPC actors and Planar Theater NPC cards. Used to tell an NPC card (0.7 kinds).
+ */
+let people = { key: "", value: null };
+export function isPersonName(name) {
+  const f = L.fold(name);
+  if ( f.length < 3 ) return false;
+  const notes = notesBy();
+  const pages = [...notes.people, ...notes.peopleTagged];
+  const key = `${pages.map(p => `${p.uuid}:${getMarkdown(p).length}`).join("|")}#${game.actors?.size ?? 0}#${linkIndex.index.entries?.length ?? 0}`;
+  if ( people.key !== key || !people.value ) {
+    const set = new Set();
+    const add = n => { for ( const v of L.nameVariants(n) ) set.add(v); };
+    for ( const page of notes.people ) for ( const p of peopleOf(page) ) [p.name, ...p.aliases].forEach(add);
+    for ( const page of notes.peopleTagged ) for ( const p of taggedPeopleOf(page) ) [p.name, ...p.aliases].forEach(add);
+    for ( const e of linkIndex.index.entries ?? [] ) if ( String(e.page?.getFlag?.(MODULE_ID, "meta")?.type ?? "").toLowerCase() === "npc" ) [e.name, ...(e.aliases ?? [])].forEach(add);
+    for ( const a of game.actors ?? [] ) if ( a.type === "npc" ) add(a.name);
+    people = { key, value: set };
+  }
+  const mine = L.nameVariants(name);
+  if ( mine.some(v => people.value.has(v)) ) return true;
+  const cast = api("planar-theater")?.cast;
+  return cast ? safe(() => cast()).some(c => [c.label, c.name].filter(Boolean).flatMap(L.nameVariants).some(v => mine.includes(v))) : false;
+}
+
 /** Names for a Lens query: "A · B" is several names (what Theater shows is often a place and its Greek title). */
 export function expandQuery(query) {
   const notes = notesBy();

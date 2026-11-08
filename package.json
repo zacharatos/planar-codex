@@ -1,6 +1,6 @@
 {
   "name": "planar-codex",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "private": true,
   "description": "Development tooling for the Planar Codex Foundry VTT module. Foundry loads the module directly; nothing here ships except the vendored files in lib/.",
   "type": "module",

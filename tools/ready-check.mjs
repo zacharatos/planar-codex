@@ -17,7 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { splitFrontmatter, fmList, citationRegex, DEFAULT_CITATION_PREFIXES } from "../scripts/markdown.mjs";
-import { parseBeats, triggerMatches, isKindOfMoment, fold } from "../scripts/prompter/core.mjs";
+import { parseBeats, triggerMatches, isKindOfMoment, fold, inferKind, KINDS } from "../scripts/prompter/core.mjs";
 import * as L from "../scripts/lens/core.mjs";
 import { parseBookIndex } from "../scripts/library/core.mjs";
 
@@ -202,10 +202,17 @@ export function checkNote(n, t, all = []) {
 }
 
 function checkDeck(beats, n, t, all, err, warn) {
-  const active = beats.filter(b => b.priority !== "watch");
-  if ( active.length > MAX_DECK ) warn(`${active.length} cards (watch cards not counted): at most ${MAX_DECK}, unless some are absent heroes' cards (they sleep and don't count)`);
+  const active = beats.filter(b => b.priority !== "watch" && inferKind(b).kind !== "rule");
+  if ( active.length > MAX_DECK ) warn(`${active.length} cards (watch and rule cards not counted): at most ${MAX_DECK}, unless some are absent heroes' cards (they sleep and don't count)`);
+  const isPerson = name => t.people.some(p => [p.name, ...p.aliases].some(x => fold(L.stripMd(x)) === fold(name) || triggerMatches(name, { kind: "npc", text: L.stripMd(x) })));
   for ( const b of beats ) {
     const at = `«${b.title}»`;
+    // Kinds (Codex 0.7): written, or guessed when Codex can tell.
+    if ( b.kindRaw && !b.kind ) err(`${at}: \`kind=${b.kindRaw}\` isn't a kind (${KINDS.join(", ")})`, b.line);
+    const k = inferKind(b, { isPerson });
+    if ( b.kind && k.guess !== b.kind && k.sure && k.guess !== "story" ) warn(`${at}: \`kind=${b.kind}\`, but it reads like a ${k.guess} card: check which one is meant`, b.line);
+    if ( !b.kind && !k.sure ) warn(`${at}: kind unclear (a roll with a rest or a fight *and* places to wait for): add \`kind=rule\` or \`kind=story\``, b.line);
+    if ( k.kind === "rule" && b.priority === "must" ) warn(`${at}: a rule card is a reminder, never "must" (it is never missed): use \`watch\``, b.line);
     if ( !b.at.length ) { err(`${at}: no \`at=\`: the card never comes up by itself`, b.line); continue; }
     for ( const p of b.pc ) if ( !t.heroes.has(fold(p)) ) err(`${at}: pc «${p}» isn't a hero (Campaign/Players)`, b.line);
     for ( const x of b.ledger ) if ( t.ledger.size && !t.ledger.has(x) ) warn(`${at}: ledger #${x} isn't in the ledger`, b.line);

@@ -222,7 +222,8 @@
         "Watch": "Listen for",
         "Sleeping": "Waiting for absent heroes",
         "Done": "Done tonight",
-        "Feed": "Notes and what the modules saw"
+        "Feed": "Notes and what the modules saw",
+        "Rules": "Rules"
       },
       "Source": {
         "Theater": "Theater",
@@ -252,7 +253,8 @@
         "Day": "Day {day}",
         "GMLongRest": "Long Rest (the GM)",
         "GMShortRest": "Short Rest (the GM)",
-        "Joined": "{name} joined the table"
+        "Joined": "{name} joined the table",
+        "Reminded": "{title} ({where})"
       },
       "LongRest": "Long Rest",
       "ShortRest": "Short Rest",
@@ -271,7 +273,40 @@
       "NudgeIdle": "Nothing has happened for {min} minutes. End of the evening?",
       "NotYet": "Not yet",
       "CloseAsOf": "Close as of {time}, the last thing that happened at the table (not now)",
-      "Somewhere": "somewhere on the map"
+      "Somewhere": "somewhere on the map",
+      "Kind": {
+        "story": "Scene",
+        "clue": "Clue",
+        "whisper": "Whisper",
+        "npc": "Person",
+        "event": "Event",
+        "rule": "Rule"
+      },
+      "Kinds": {
+        "all": "All",
+        "story": "Scenes",
+        "clue": "Clues",
+        "whisper": "Whispers",
+        "npc": "People",
+        "event": "Events",
+        "rule": "Rules"
+      },
+      "KindFilter": "Show cards of one kind",
+      "KindAsk": "What kind?",
+      "KindChange": "Kind:",
+      "KindGuessTip": "{kind} (guessed). Click to change it",
+      "KindWrittenTip": "{kind}. Click to change it",
+      "KindSaved": "«{title}» is now a {kind} card (written into the run sheet)",
+      "KindNotSaved": "Couldn't write the kind into the run sheet: edit the beat's line by hand (kind=…)",
+      "FilterEmpty": "No cards of this kind in tonight's deck.",
+      "Found": "Found",
+      "NotFound": "Not found",
+      "Sent": "Sent",
+      "OpenLens": "Open {name} in the Lens",
+      "RuleShow": "Show this rule now",
+      "RuleDismiss": "Dismiss",
+      "RuleByHand": "by hand",
+      "RemindedTip": "Reminded tonight: {times}"
     },
     "Lens": {
       "Title": "Lens",

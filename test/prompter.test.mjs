@@ -251,3 +251,66 @@ test("the live log names absent heroes and uses the played time", () => {
   assert.match(md, /💤 Elaion absent \(not counted\)/);
   assert.match(md, /\*\*Played\*\* 3:06/);
 });
+
+/* ---- 0.7: card kinds and rule cards ---- */
+
+test("kind=: written kinds, Greek and English aliases, bare words", () => {
+  assert.equal(P.parseBeatMeta("should|kind=clue|at=x").kind, "clue");
+  assert.equal(P.parseBeatMeta("kind=Κανόνας").kind, "rule");
+  assert.equal(P.parseBeatMeta("watch|rule|at=Short Rest").kind, "rule");
+  assert.equal(P.parseBeatMeta("watch|rule").priority, "watch");
+  const bad = P.parseBeatMeta("kind=banana");
+  assert.equal(bad.kind, null);
+  assert.equal(bad.kindRaw, "banana");
+  assert.equal(P.parseBeatMeta("must").kind, null);
+});
+
+test("inferKind: title, whispers, rules, clues, people, events, story", () => {
+  const k = (md, opts) => P.inferKind(P.parseBeats(md)[0], opts);
+  assert.equal(k("> [!beat|watch|at=Twisted Tea Party] Rule: the cake is a curse\n> - 1d4 hours").kind, "rule");
+  assert.equal(k("> [!beat|watch|at=x] Κανόνας: η τούρτα\n> - …").kind, "rule");
+  assert.equal(k("> [!beat|fit|at=Dumien plays] Lullaby\n>\n> > [!whisper|memory] Lothrik\n> >\n> > «…»").kind, "whisper");
+  const rule = k("> [!beat|watch|at=Short Rest|pc=Lothrik] Poisoned Roots\n> - [[/save ability=con dc=15]] or nothing");
+  assert.deepEqual([rule.kind, rule.sure, rule.written], ["rule", true, false]);
+  assert.equal(k("> [!beat|should|at=The Old Library] Under the cellar door\n> A clue: [[/check ability=wis skill=prc dc=15]]").kind, "clue");
+  assert.equal(k("> [!beat|should|at=Riaen; Ράιεν] Riaen's answer\n> She says…", { isPerson: n => /riaen|ράιεν/i.test(n) }).kind, "npc");
+  assert.equal(k("> [!beat|fit|at=Riaen; any meal] Breakfast\n> …", { isPerson: n => /riaen/i.test(n) }).kind, "story");
+  assert.equal(k("> [!beat|fit|at=at night; whenever the energy dips] The bell\n> It rings.").kind, "event");
+  assert.equal(k("> [!beat|must|at=The Wayfarer] The sergeant\n> [[/check ability=wis skill=prc dc=13]]").kind, "story");
+});
+
+test("inferKind: unsure when a roll waits for a rest *and* a place; a written kind wins", () => {
+  const md = "> [!beat|should|at=Short Rest; The Wayfarer] Night at the inn\n> [[/save ability=con dc=12]]";
+  const guessed = P.inferKind(P.parseBeats(md)[0]);
+  assert.equal(guessed.sure, false);
+  assert.equal(guessed.kind, "story");
+  const written = P.inferKind(P.parseBeats(md.replace("should|", "should|kind=rule|"))[0]);
+  assert.deepEqual([written.kind, written.sure, written.written], ["rule", true, true]);
+});
+
+test("setBeatKind writes kind= after the priority and replaces an old one", () => {
+  const md = "---\ntype: prep\n---\n# Deck\n\n> [!beat|watch|at=Short Rest|pc=Lothrik] Rule: Poisoned Roots\n> - body\n";
+  const [b] = P.parseBeats(md);
+  const one = P.setBeatKind(md, b.line, "rule");
+  assert.match(one, /^> \[!beat\|watch\|kind=rule\|at=Short Rest\|pc=Lothrik\] Rule: Poisoned Roots$/m);
+  const two = P.setBeatKind(one, b.line, "story");
+  assert.match(two, /\[!beat\|watch\|kind=story\|at=Short Rest/);
+  assert.doesNotMatch(two, /kind=rule/);
+  assert.equal(P.parseBeats(two)[0].id, b.id, "the id doesn't change");
+  assert.match(P.setBeatKind("> [!beat] Plain\n> x", 0, "clue"), /^> \[!beat\|kind=clue\] Plain/);
+  assert.match(P.setBeatKind("> [!beat|at=x|rule] T\n", 0, "npc"), /^> \[!beat\|kind=npc\|at=x\] T/);
+  assert.equal(P.setBeatKind(md, 0, "rule"), null);
+  assert.equal(P.setBeatKind(md, b.line, "banana"), null);
+  assert.ok(P.setBeatKind("> [!beat] A\r\n> x\r\n", 0, "clue").includes("\r\n"), "keeps Windows line ends");
+});
+
+test("live log: kind icons, rule cards log when they reminded, never as missed", () => {
+  const md = "> [!beat|watch|at=Short Rest|pc=Lothrik] Rule: Poisoned Roots\n> [[/save ability=con dc=15]]\n\n> [!beat|watch|at=Gertrube] Rule: the cake\n> x\n\n> [!beat|should|kind=clue|at=The Old Library] The deed\n> x";
+  const beats = P.parseBeats(md);
+  const kindOf = b => P.inferKind(b).kind;
+  const state = runAt("2026-11-13T18:00:00.000Z", [{ t: "2026-11-13T20:00:00.000Z", kind: "rule", beat: beats[0].id, text: "x" }]);
+  const log = P.buildLiveLog({ sheetName: "S", session: "4", beats, state, kindOf });
+  assert.match(log, /\| ⚖ \| 👂 \| ⚖ Rule: Poisoned Roots \| {2}\| reminded \d\d:\d\d \|/);
+  assert.match(log, /\| · \| 👂 \| ⚖ Rule: the cake \| {2}\| rule: not needed tonight/);
+  assert.match(log, /\| ☐ \| 🟡 \| 🔍 The deed \|/);
+});

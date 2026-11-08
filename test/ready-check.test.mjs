@@ -53,3 +53,20 @@ test("ready check: one note at a time", () => {
   const results = run(vault(), { only: "Prep/Chapter 01.md" });
   assert.deepEqual(results.map(r => r.path), ["Prep/Chapter 01.md"]);
 });
+
+test("ready check: card kinds (0.7): unknown, unclear, contradicting, rule as must", () => {
+  const dir = vault();
+  fs.writeFileSync(path.join(dir, "Prep/Session 02 - run sheet.md"), "---\ntype: prep\n---\n" + [
+    "> [!beat|should|kind=banana|at=The Old Library; η Παλιά Βιβλιοθήκη] Bad kind\n> x",
+    "> [!beat|should|at=Short Rest; The Old Library; η Παλιά Βιβλιοθήκη] Unclear\n> [[/save ability=con dc=12]]",
+    "> [!beat|should|kind=clue|at=Short Rest] Says clue, reads like a rule\n> [[/save ability=con dc=15]]",
+    "> [!beat|must|at=Short Rest|pc=Ilsa] Rule: must is wrong\n> x",
+    "> [!beat|watch|kind=rule|at=Short Rest|pc=Ilsa] Rule: fine\n> [[/save ability=con dc=15]]"
+  ].join("\n\n"));
+  const deck = (run(dir).find(r => r.path === "Prep/Session 02 - run sheet.md")?.findings ?? []).map(f => `${f.level}: ${f.msg}`);
+  assert.ok(deck.some(m => /^error: «Bad kind»: `kind=banana` isn't a kind/.test(m)));
+  assert.ok(deck.some(m => /^warn: «Unclear»: kind unclear/.test(m)));
+  assert.ok(deck.some(m => /«Says clue, reads like a rule»: `kind=clue`, but it reads like a rule card/.test(m)));
+  assert.ok(deck.some(m => /«Rule: must is wrong»: a rule card is a reminder/.test(m)));
+  assert.ok(!deck.some(m => /«Rule: fine»/.test(m)));
+});

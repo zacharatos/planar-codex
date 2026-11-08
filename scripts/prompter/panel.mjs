@@ -12,13 +12,15 @@ import { MODULE_ID, localize, convert, getMarkdown, isCodexPage, updateMarkdown 
 import { escapeHTML } from "../markdown.mjs";
 import { decorateCallouts } from "../actions.mjs";
 import { createCodexNote } from "../notes.mjs";
-import { parseNote, buildLiveLog, pad2, duration, hash, isKindOfMoment, NOTE_TAGS, lastActivity, closeNudge, isNight } from "./core.mjs";
+import { parseNote, buildLiveLog, pad2, duration, hash, isKindOfMoment, NOTE_TAGS, lastActivity, closeNudge, isNight, KINDS, KIND_ICONS } from "./core.mjs";
+import { kindInfo, kindOf, kindFilter, setKindFilter, writeKind } from "./kinds.mjs";
+import { showRuleToast } from "./toasts.mjs";
 import {
   subscribe, sheetPage, setSheet, candidateSheets, readSheet, run, mutateRun, setBeat, addNote, removeNote,
   asleep, absentHeroes, spotlight, setPresent, livePresence, flush
 } from "./state.mjs";
 import { hotBeats, cool, hear, recentContexts, whispersSince, moduleApi, isActiveGM, gmRest } from "./context.mjs";
-import { lens } from "../lens/index.mjs";
+import { lens, setLensTarget } from "../lens/index.mjs";
 import { renderLens, onLensClick, onLensSearch } from "../lens/view.mjs";
 import { openLibrary, wireCitations } from "../library/index.mjs";
 
@@ -85,6 +87,8 @@ export class PrompterPanel extends ApplicationV2 {
   /** The last ✓ / ✗ / later, for the Undo bar: {id, prev, text, until}. */
   #undo = null;
   #undoTimer = null;
+  /** Cards whose kind picker is open (the GM clicked the kind badge). */
+  picking = new Set();
   /** The close offer on screen ("rest" | "idle" | null), and the activity the GM last said "not yet" to. */
   #nudge = null;
   #nudgeDismissed = null;
@@ -141,21 +145,31 @@ export class PrompterPanel extends ApplicationV2 {
     const r = run(page);
     const hot = hotBeats();
     const status = id => r.beats[id]?.s ?? null;
+    const filter = kindFilter();
+    const show = b => filter === "all" || kindOf(b) === filter;
+    const isRule = b => kindOf(b) === "rule";
     const beats = sheet.beats;
-    const open = beats.filter(b => !DONE.includes(status(b.id)));
+    // Rule cards are looked up, not played: their own section (folded unless the Κανόνες chip is on), never "missed".
+    const rules = beats.filter(isRule).filter(show);
+    const cards = beats.filter(b => !isRule(b));
+    const open = cards.filter(b => !DONE.includes(status(b.id)));
     const awake = open.filter(b => !asleep(b));
-    const sleeping = open.filter(b => asleep(b));
-    const must = awake.filter(b => b.priority === "must");
-    const now = awake.filter(b => b.priority !== "must" && hot.has(b.id)).sort((a, b) => hot.get(b.id).t.localeCompare(hot.get(a.id).t));
+    const sleeping = open.filter(b => asleep(b)).filter(show);
+    const must = awake.filter(b => b.priority === "must").filter(show);
+    const now = awake.filter(b => b.priority !== "must" && hot.has(b.id)).filter(show).sort((a, b) => hot.get(b.id).t.localeCompare(hot.get(a.id).t));
     const later = b => (status(b.id) === "later" ? 1 : 0);
-    const deck = awake.filter(b => ["should", "fit"].includes(b.priority) && !hot.has(b.id))
+    const deck = awake.filter(b => ["should", "fit"].includes(b.priority) && !hot.has(b.id)).filter(show)
       .sort((a, b) => later(a) - later(b) || (a.priority === b.priority ? a.order - b.order : a.priority === "should" ? -1 : 1));
-    const watch = awake.filter(b => b.priority === "watch" && !hot.has(b.id));
-    const done = beats.filter(b => DONE.includes(status(b.id))).sort((a, b) => String(r.beats[b.id].t).localeCompare(String(r.beats[a.id].t)));
+    const watch = awake.filter(b => b.priority === "watch" && !hot.has(b.id)).filter(show);
+    const done = cards.filter(b => DONE.includes(status(b.id))).filter(show).sort((a, b) => String(r.beats[b.id].t).localeCompare(String(r.beats[a.id].t)));
 
-    const section = (cls, icon, title, list, empty = "") => (list.length || empty ? `<section class="pr-section ${cls}">
+    const section = (cls, icon, title, list, empty = "") => (list.length || (empty && filter === "all") ? `<section class="pr-section ${cls}">
       <h3><i class="${icon}"></i> ${title} <span class="pr-count">${list.length}</span></h3>
       ${list.length ? list.map(b => this.#card(b, r, hot)).join("") : `<p class="pr-none">${empty}</p>`}</section>` : "");
+    const rulesHTML = !rules.length ? ""
+      : filter === "rule" ? section("pr-rules", "fa-solid fa-scale-balanced", localize("Prompter.Section.Rules"), rules)
+        : `<details class="pr-fold pr-rules"><summary><i class="fa-solid fa-scale-balanced"></i> ${localize("Prompter.Section.Rules")} <span class="pr-count">${rules.length}</span></summary>${rules.map(b => this.#card(b, r, hot)).join("")}</details>`;
+    const nothing = filter !== "all" && !(must.length || now.length || deck.length || watch.length || sleeping.length || done.length || rules.length);
 
     this.#nudge = closeNudge(r, Date.now(), { idleMinutes: IDLE_MINUTES, dismissedAt: this.#nudgeDismissed });
     return `<div class="prompter">
@@ -163,12 +177,15 @@ export class PrompterPanel extends ApplicationV2 {
       ${this.#header(page, sheet, r)}
       ${this.#nudgeBar()}
       ${this.#spotlight(page, r)}
+      ${this.#filters(beats, r, filter)}
       ${r.active ? "" : `<div class="pr-start-hint"><i class="fa-solid fa-circle-info"></i> ${localize(r.closedAt ? "Prompter.ClosedHint" : "Prompter.StartHint")}</div>`}
       ${section("pr-must", "fa-solid fa-circle-exclamation", localize("Prompter.Section.Must"), must, localize("Prompter.MustDone"))}
       ${section("pr-now", "fa-solid fa-bolt", localize("Prompter.Section.Now"), now)}
       ${section("pr-deck", "fa-solid fa-layer-group", localize("Prompter.Section.Deck"), deck, localize("Prompter.DeckEmpty"))}
       ${section("pr-watch", "fa-solid fa-ear-listen", localize("Prompter.Section.Watch"), watch)}
       ${sleeping.length ? `<details class="pr-fold pr-sleep"><summary><i class="fa-solid fa-moon"></i> ${localize("Prompter.Section.Sleeping")} <span class="pr-count">${sleeping.length}</span></summary>${sleeping.map(b => this.#card(b, r, hot)).join("")}</details>` : ""}
+      ${rulesHTML}
+      ${nothing ? `<p class="pr-none pr-filter-empty">${localize("Prompter.FilterEmpty")}</p>` : ""}
       ${done.length ? `<details class="pr-fold pr-done"><summary><i class="fa-solid fa-check-double"></i> ${localize("Prompter.Section.Done")} <span class="pr-count">${done.length}</span></summary>${done.map(b => this.#card(b, r, hot)).join("")}</details>` : ""}
       ${this.#feed(r)}
       ${this.#noteBox()}
@@ -241,7 +258,40 @@ export class PrompterPanel extends ApplicationV2 {
     return `<div class="pr-spot"><i class="fa-solid fa-lightbulb" data-tooltip="${esc(localize("Prompter.Spotlight"))}"></i> ${chips}</div>`;
   }
 
+  /** Όλα · Σκηνές · Στοιχεία · Ψίθυροι · Πρόσωπα · Γεγονότα · Κανόνες, with how many open cards each has. */
+  #filters(beats, r, filter) {
+    const counts = Object.fromEntries(KINDS.map(k => [k, 0]));
+    for ( const b of beats ) {
+      const k = kindOf(b);
+      if ( k === "rule" || !DONE.includes(r.beats[b.id]?.s) ) counts[k]++;
+    }
+    const used = KINDS.filter(k => counts[k]);
+    if ( used.length < 2 && filter === "all" ) return "";
+    const chip = (k, label, n) => `<button type="button" class="pr-filter ${filter === k ? "active" : ""} ${k === "all" ? "" : `pr-kind-${k}`}" data-pr="filter" data-kind="${k}" aria-pressed="${filter === k}">
+      ${k === "all" ? "" : `<span aria-hidden="true">${KIND_ICONS[k]}</span> `}${label}${n === null ? "" : ` <b>${n}</b>`}</button>`;
+    return `<nav class="pr-filters" aria-label="${esc(localize("Prompter.KindFilter"))}">
+      ${chip("all", localize("Prompter.Kinds.all"), null)}
+      ${KINDS.filter(k => counts[k] || filter === k).map(k => chip(k, localize(`Prompter.Kinds.${k}`), counts[k])).join("")}
+    </nav>`;
+  }
+
+  /** The kind badge (click: change it), and the picker when Codex can't tell or the GM asked. */
+  #kindBadge(b, info) {
+    const label = localize(`Prompter.Kind.${info.kind}`);
+    const tip = localize(info.written ? "Prompter.KindWrittenTip" : "Prompter.KindGuessTip", { kind: label });
+    return `<button type="button" class="pr-kind-badge pr-kind-${info.kind} ${info.written ? "" : "pr-guess"}" data-pr="kind-menu" data-tooltip="${esc(tip)}" aria-label="${esc(tip)}">${KIND_ICONS[info.kind]}</button>`;
+  }
+
+  #kindPicker(b, info, asked) {
+    const chips = KINDS.map(k => `<button type="button" class="pr-kind-pick pr-kind-${k} ${info.kind === k ? "active" : ""}" data-pr="kind-set" data-kind="${k}">
+      <span aria-hidden="true">${KIND_ICONS[k]}</span> ${localize(`Prompter.Kind.${k}`)}</button>`).join("");
+    return `<div class="pr-kind-picker" role="group" aria-label="${esc(localize("Prompter.KindAsk"))}">
+      <span class="pr-kind-ask">${localize(asked ? "Prompter.KindAsk" : "Prompter.KindChange")}</span>${chips}</div>`;
+  }
+
   #card(b, r, hot) {
+    const info = kindInfo(b);
+    if ( info.kind === "rule" ) return this.#ruleCard(b, r, info);
     const st = r.beats[b.id]?.s ?? null;
     const isDone = DONE.includes(st);
     const h = hot.get(b.id);
@@ -250,18 +300,27 @@ export class PrompterPanel extends ApplicationV2 {
     const missed = b.missed ? `<span class="pr-missed" data-tooltip="${esc(localize("Prompter.MissedTip", { n: b.missed }))}">×${b.missed}</span>` : "";
     const pcs = b.pc.map(n => `<span class="pr-pc">${esc(n)}</span>`).join("");
     const trig = b.at.map(t => `<span class="pr-trig ${isKindOfMoment(t) ? "pr-kind" : ""}">${esc(t)}</span>`).join("");
+    // A clue is found or not found; a whisper is sent; the rest are played or skipped.
+    const ok = { clue: ["Prompter.Found", "fa-magnifying-glass-plus"], whisper: ["Prompter.Sent", "fa-paper-plane"] }[info.kind] ?? ["Prompter.Played", "fa-check"];
+    const no = info.kind === "clue" ? ["Prompter.NotFound", "fa-eye-slash"] : ["Prompter.Skip", "fa-xmark"];
+    const doneMark = st === "played" ? (info.kind === "clue" ? "🔍" : "✓") : "✗";
+    const lensBtn = info.kind === "npc" && !isDone ? `<button type="button" class="pr-btn pr-lens" data-pr="lens-npc" data-tooltip="${esc(localize("Prompter.OpenLens", { name: this.#personOf(b) }))}"><i class="fa-solid fa-user"></i></button>` : "";
     const buttons = isDone
-      ? `<span class="pr-when">${st === "played" ? "✓" : "✗"} ${hhmm(r.beats[b.id].t)}</span><button type="button" class="pr-btn" data-pr="reset" data-tooltip="${esc(localize("Prompter.Reset"))}"><i class="fa-solid fa-rotate-left"></i></button>`
-      : `<button type="button" class="pr-btn pr-ok" data-pr="played" data-tooltip="${esc(localize("Prompter.Played"))}"><i class="fa-solid fa-check"></i></button>
-         <button type="button" class="pr-btn pr-no" data-pr="skip" data-tooltip="${esc(localize("Prompter.Skip"))}"><i class="fa-solid fa-xmark"></i></button>`;
-    const classes = ["pr-card", `pr-${b.priority}`, h && !isDone ? "pr-hot" : "", open ? "pr-open" : "", st === "later" ? "pr-later" : "", isDone ? `pr-${st}` : ""].filter(Boolean).join(" ");
+      ? `<span class="pr-when">${doneMark} ${hhmm(r.beats[b.id].t)}</span><button type="button" class="pr-btn" data-pr="reset" data-tooltip="${esc(localize("Prompter.Reset"))}"><i class="fa-solid fa-rotate-left"></i></button>`
+      : `${lensBtn}<button type="button" class="pr-btn pr-ok" data-pr="played" data-tooltip="${esc(localize(ok[0]))}"><i class="fa-solid ${ok[1]}"></i></button>
+         <button type="button" class="pr-btn pr-no" data-pr="skip" data-tooltip="${esc(localize(no[0]))}"><i class="fa-solid ${no[1]}"></i></button>`;
+    const asked = !info.sure && !info.written && !isDone;
+    const picker = asked || this.picking.has(b.id) ? this.#kindPicker(b, info, asked) : "";
+    const classes = ["pr-card", `pr-${b.priority}`, `pr-kind-${info.kind}`, h && !isDone ? "pr-hot" : "", open ? "pr-open" : "", st === "later" ? "pr-later" : "", isDone ? `pr-${st}` : ""].filter(Boolean).join(" ");
     return `<article class="${classes}" data-beat="${esc(b.id)}">
       <div class="pr-row" data-pr="toggle">
         <i class="pr-caret fa-solid ${open ? "fa-caret-down" : "fa-caret-right"}"></i>
+        ${this.#kindBadge(b, info)}
         <span class="pr-title">${esc(b.title)}</span>
         <span class="pr-meta">${ledger}${missed}</span>
         <span class="pr-btns">${buttons}</span>
       </div>
+      ${picker}
       ${h && !isDone ? `<div class="pr-heard"><i class="fa-solid fa-bolt"></i> ${esc(h.where)} · ${hhmm(h.t)} <a data-pr="cool">${localize("Prompter.NotNow")}</a></div>` : ""}
       ${!isDone && asleep(b) ? `<div class="pr-asleep"><i class="fa-solid fa-moon"></i> ${localize("Prompter.AsleepWhy", { names: esc(absentHeroes(b).join(", ")) })}</div>` : ""}
       ${open ? `<div class="pr-sub">${pcs}${trig}</div>
@@ -271,6 +330,35 @@ export class PrompterPanel extends ApplicationV2 {
           <button type="button" data-pr="jump"><i class="fa-solid fa-location-arrow"></i> ${localize("Prompter.Jump")}</button>
         </div>` : ""}
     </article>`;
+  }
+
+  /** A rule card: in the deck to look up, never ticked; its toast shows at its moment (or now, with ⚖). */
+  #ruleCard(b, r, info) {
+    const open = this.expanded.has(b.id);
+    const times = (r.events ?? []).filter(e => e.kind === "rule" && e.beat === b.id).map(e => hhmm(e.t));
+    const sleeping = asleep(b);
+    const trig = b.at.map(t => `<span class="pr-trig ${isKindOfMoment(t) ? "pr-kind" : ""}">${esc(t)}</span>`).join("");
+    const pcs = b.pc.map(n => `<span class="pr-pc">${esc(n)}</span>`).join("");
+    const picker = this.picking.has(b.id) ? this.#kindPicker(b, info, false) : "";
+    return `<article class="pr-card pr-kind-rule ${open ? "pr-open" : ""} ${sleeping ? "pr-sleeping" : ""}" data-beat="${esc(b.id)}">
+      <div class="pr-row" data-pr="toggle">
+        <i class="pr-caret fa-solid ${open ? "fa-caret-down" : "fa-caret-right"}"></i>
+        ${this.#kindBadge(b, info)}
+        <span class="pr-title">${esc(b.title)}</span>
+        <span class="pr-meta">${times.length ? `<span class="pr-reminded" data-tooltip="${esc(localize("Prompter.RemindedTip", { times: times.join(", ") }))}">⚖ ${times.length}</span>` : ""}</span>
+        <span class="pr-btns"><button type="button" class="pr-btn pr-rule-show" data-pr="rule-show" data-tooltip="${esc(localize("Prompter.RuleShow"))}"><i class="fa-solid fa-scale-balanced"></i></button></span>
+      </div>
+      ${picker}
+      ${sleeping ? `<div class="pr-asleep"><i class="fa-solid fa-moon"></i> ${localize("Prompter.AsleepWhy", { names: esc(absentHeroes(b).join(", ")) })}</div>` : ""}
+      ${open ? `<div class="pr-sub">${pcs}${trig}</div>
+        <div class="pr-body" data-body="${esc(b.id)}"><i class="fa-solid fa-spinner fa-spin"></i></div>
+        <div class="pr-acts"><button type="button" data-pr="jump"><i class="fa-solid fa-location-arrow"></i> ${localize("Prompter.Jump")}</button></div>` : ""}
+    </article>`;
+  }
+
+  /** The person an NPC card is about: its first moment that names one, else its title. */
+  #personOf(b) {
+    return b.at.find(t => !isKindOfMoment(t)) ?? b.title;
   }
 
   #feed(r) {
@@ -431,6 +519,34 @@ export class PrompterPanel extends ApplicationV2 {
         return;
       }
       case "rest": return gmRest(!!target.dataset.long);
+      case "filter": {
+        const k = target.dataset.kind;
+        await setKindFilter(k === kindFilter() ? "all" : k);
+        return this.render();
+      }
+      case "kind-menu":
+        if ( this.picking.has(id) ) this.picking.delete(id); else this.picking.add(id);
+        return this.render();
+      case "kind-set": {
+        const beat = readSheet(page)?.beats.find(b => b.id === id);
+        const kind = target.dataset.kind;
+        this.picking.delete(id);
+        const ok = await writeKind(page, beat, kind).catch(err => { console.warn(err); return false; });
+        if ( ok ) ui.notifications.info(localize("Prompter.KindSaved", { title: beat.title, kind: localize(`Prompter.Kind.${kind}`) }));
+        else if ( beat && kindOf(beat) !== kind ) ui.notifications.warn(localize("Prompter.KindNotSaved"));
+        return this.render();
+      }
+      case "lens-npc": {
+        const beat = readSheet(page)?.beats.find(b => b.id === id);
+        if ( !beat ) return;
+        setLensTarget(this.#personOf(beat), { source: localize("Prompter.Title") });
+        this.tab = "lens";
+        return this.render();
+      }
+      case "rule-show": {
+        const beat = readSheet(page)?.beats.find(b => b.id === id);
+        return showRuleToast(beat, page, localize("Prompter.RuleByHand"));
+      }
       case "hero-toggle": return setPresent(target.dataset.actor, !!target.dataset.on, page);
       case "nudge-later": this.#nudgeDismissed = lastActivity(run(page)); return this.render();
       case "reset": return setBeat(id, null, "", page);
@@ -509,7 +625,7 @@ export async function closeSession(page = sheetPage()) {
   if ( !page ) return;
   const sheet = readSheet(page);
   const r = run(page);
-  const open = sheet.beats.filter(b => !DONE.includes(r.beats[b.id]?.s) && !asleep(b));
+  const open = sheet.beats.filter(b => !DONE.includes(r.beats[b.id]?.s) && !asleep(b) && kindOf(b) !== "rule");
   const must = open.filter(b => b.priority === "must");
   const questions = sheet.questions.map((q, i) => `<div class="form-group stacked"><label>${i + 1}. ${esc(q)}</label>
     <textarea name="q${i}" rows="2">${esc(r.answers?.[i] ?? "")}</textarea></div>`).join("");
@@ -554,7 +670,7 @@ export async function writeLiveLog(page = sheetPage(), { open = false } = {}) {
   const name = `Session ${nn} - live log`;
   const markdown = buildLiveLog({
     sheetName: page.parent?.name ?? page.name, session: sheet.session || "?", beats: sheet.beats, state: r,
-    questions: sheet.questions, asleep, absent: absentHeroes,
+    questions: sheet.questions, asleep, absent: absentHeroes, kindOf,
     spotlight: spotlight(page, whispersSince(r.startedAt)).map(h => ({ name: h.name, count: h.count, present: h.present }))
   });
   let logPage = r.logUuid ? fromUuidSync(r.logUuid, { strict: false }) : null;

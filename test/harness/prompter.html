@@ -54,7 +54,8 @@
   const md = await (await fetch(params.get("sheet") ?? "run-sheet.md")).text();
   const page = { id: "rs", name: "Session 07 - run sheet", uuid: "JournalEntry.rs.JournalEntryPage.rs", documentName: "JournalEntryPage", type: "text",
     text: { markdown: md, content: "" }, flags: { "planar-codex": { path: "Prep/Session 07 - run sheet.md" } },
-    getFlag(s, k) { return s === "core" ? (k === "sheetClass" ? "planar-codex.CodexMarkdownSheet" : null) : this.flags[s]?.[k]; } };
+    getFlag(s, k) { return s === "core" ? (k === "sheetClass" ? "planar-codex.CodexMarkdownSheet" : null) : this.flags[s]?.[k]; },
+    update: async d => { if ( "text.markdown" in d ) page.text.markdown = d["text.markdown"]; window.pageUpdates = (window.pageUpdates ?? 0) + 1; } };
   page.parent = { name: page.name, pages: [page], sheet: { render() {} } };
   const users = [
     { id: "gm", name: "GM", isGM: true, active: true },

@@ -3,9 +3,26 @@
 All notable changes to this module. Format follows [Keep a Changelog](https://keepachangelog.com/); versions follow [SemVer](https://semver.org/).
 The release workflow uses the section matching the tag as the GitHub release notes, so keep the `## [x.y.z]` headings exact.
 
-## [Unreleased]
+## [0.7.0]
 
-Fixes from Session 03 (the Prompter at the table). Version number to be set at release.
+Codex 0.7 "Cards", part 1: card kinds and rule toasts. (The Place and NPC cards, keys and the Now strip follow.)
+
+### Added
+- **Card kinds.** A beat can say what it is with `kind=` (`story`, `clue`, `whisper`, `npc`, `event`, `rule`; Greek works too: `kind=Κανόνας`). Without it, the Prompter guesses: a title like «Rule: …» or «Κανόνας: …», a body that is only private lines (whisper), a roll that waits only for a rest, a fight or a death (rule), a check that mentions a clue, moments that are only people (npc), only times of day or «whenever …» (event); otherwise a scene.
+- Each card shows its kind as a coloured badge (dashed when guessed). Click it to change the kind: the choice is written into the run sheet as `kind=…`, so the vault gets it on the next export. When a card could be read two ways, its picker is open with «What kind?».
+- **Filter chips** under the spotlight: All · Scenes · Clues · Whispers · People · Events · Rules, with how many cards each has. The choice is remembered per GM.
+- Clue cards are *found* / *not found*; whisper cards are *sent*; person cards have a button that opens the person in the Lens.
+- **Rule cards** (`kind=rule`) are reminders, not beats: when their moment comes (a Short or Long Rest, the end of a fight, a death, or a place or person they name), a GM-only box shows the rule with its roll buttons at the top of the screen and stays until dismissed. They live in their own *Rules* section (folded, or open with the Rules chip), with a ⚖ button to show one now; they are never "must" nor "missed". The live log says when each one reminded.
+- `tools/ready-check.mjs`: an unknown `kind=` is an error; a card whose kind is unclear, a written kind that contradicts what the card reads like, and a rule card marked `must` are warnings. Rule cards don't count towards the deck size.
+- API: `api.prompter.kind(idOrBeat)` → `{kind, sure, written, guess}`; `api.prompter.core.inferKind`, `setBeatKind`, `KINDS`.
+
+### Changed
+- Beat callouts with a written kind get a `codex-beat-kind-<kind>` class in the reading view.
+- The test harness run sheet has a rule card, a clue card and a card whose kind is unclear.
+
+## [0.6.2]
+
+Fixes from Session 03 (the Prompter at the table).
 
 ### Fixed
 - The console window (Prompter and Lens) scrolls: long decks and Lens stacks were cut off at the bottom.
